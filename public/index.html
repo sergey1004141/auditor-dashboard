@@ -223,12 +223,14 @@
 
       .rules-config {
         display: grid;
-        grid-template-columns: 120px minmax(180px, 1fr) auto;
+        grid-template-columns: 120px minmax(220px, 1fr) 150px 150px auto;
         gap: 6px;
+        align-items: center;
       }
 
       .rules-config input,
-      .rules-config button {
+      .rules-config button,
+      .rules-config .rules-chip {
         height: 30px;
         border: 1px solid var(--line);
         border-radius: 6px;
@@ -250,21 +252,20 @@
       }
 
       .rules-summary {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(100px, 1fr));
-        gap: 6px;
-        margin-top: 8px;
+        display: none;
       }
 
       .rules-chip {
         border: 1px solid var(--line);
         border-radius: 6px;
-        padding: 6px 8px;
+        padding: 0 8px;
         background: #fbfcfe;
         font-size: 12px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        display: flex;
+        align-items: center;
       }
 
       .rules-chip strong {
@@ -457,12 +458,10 @@
             <form class="rules-config" id="rulesForm">
               <input id="rulesRole" name="role" value="Developer" placeholder="Роль" autocomplete="off" />
               <input id="rulesPath" name="rulesPath" placeholder="\\\\PC\\share\\rules\\developer.rules" autocomplete="off" />
-              <button type="submit">Сохранить</button>
-            </form>
-            <div class="rules-summary">
               <div class="rules-chip"><strong>Статус</strong><span id="rulesStatus">-</span></div>
               <div class="rules-chip"><strong>Изменения</strong><span id="rulesChanges">-</span></div>
-            </div>
+              <button type="submit">Сохранить</button>
+            </form>
             <div class="rules-list" id="rulesFindings"></div>
           </div>
         </article>
