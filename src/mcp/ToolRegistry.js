@@ -1,8 +1,9 @@
 export class ToolRegistry {
-  constructor(projectMonitor, systemStatusService = null, rulesMonitor = null) {
+  constructor(projectMonitor, systemStatusService = null, rulesMonitor = null, tokenUsageService = null) {
     this.projectMonitor = projectMonitor;
     this.systemStatusService = systemStatusService;
     this.rulesMonitor = rulesMonitor;
+    this.tokenUsageService = tokenUsageService;
   }
 
   list() {
@@ -108,6 +109,11 @@ export class ToolRegistry {
       {
         name: "gpu_metrics",
         description: "Return current GPU usage and controller information.",
+        inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      },
+      {
+        name: "token_usage",
+        description: "Return local Codex token usage and rate limit percent from token_count session logs.",
         inputSchema: { type: "object", properties: {}, additionalProperties: false },
       },
       {
@@ -232,6 +238,8 @@ export class ToolRegistry {
         return this.result(await this.requireSystemStatus().diskMetrics());
       case "gpu_metrics":
         return this.result(await this.requireSystemStatus().gpuMetrics());
+      case "token_usage":
+        return this.result(await this.requireTokenUsage().status());
       case "system_services":
         return this.result(await this.requireSystemStatus().services(args.names ?? []));
       case "rdp_status":
@@ -274,6 +282,13 @@ export class ToolRegistry {
       throw new Error("Rules monitor is not configured.");
     }
     return this.rulesMonitor;
+  }
+
+  requireTokenUsage() {
+    if (!this.tokenUsageService) {
+      throw new Error("Token usage service is not configured.");
+    }
+    return this.tokenUsageService;
   }
 
   result(value) {

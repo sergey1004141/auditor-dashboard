@@ -86,7 +86,7 @@
 
       .cards {
         display: grid;
-        grid-template-columns: repeat(4, minmax(160px, 1fr));
+        grid-template-columns: repeat(5, minmax(150px, 1fr));
         gap: 8px;
       }
 
@@ -350,7 +350,7 @@
 
       @media (max-width: 1100px) {
         .cards {
-          grid-template-columns: repeat(4, minmax(120px, 1fr));
+          grid-template-columns: repeat(3, minmax(120px, 1fr));
         }
       }
 
@@ -397,6 +397,12 @@
           <div class="value" id="diskValue">-</div>
           <div class="bar"><div class="bar-fill" id="diskBar"></div></div>
           <div class="detail" id="diskDetail">used / total</div>
+        </article>
+        <article class="card">
+          <div class="label">Tokens</div>
+          <div class="value" id="tokenValue">-</div>
+          <div class="bar"><div class="bar-fill" id="tokenBar"></div></div>
+          <div class="detail" id="tokenDetail">used today</div>
         </article>
       </section>
 
@@ -586,6 +592,20 @@
         renderDisks(disks);
       }
 
+      function renderTokenUsage(tokens) {
+        if (!tokens.available) {
+          $("tokenValue").textContent = "n/a";
+          $("tokenDetail").textContent = tokens.message || "no local token_count";
+          setBar("tokenBar", 0);
+          return;
+        }
+
+        const percent = Number(tokens.percent ?? 0);
+        $("tokenValue").textContent = tokens.percentFormatted || `${percent.toFixed(3)}%`;
+        $("tokenDetail").textContent = `${Number(tokens.today?.totalTokens ?? 0).toLocaleString("ru-RU")} tokens today`;
+        setBar("tokenBar", percent);
+      }
+
       function renderRules(status) {
         $("rulesStatus").textContent = status.status || "-";
         $("rulesFiles").textContent = status.trackedFiles ?? "-";
@@ -650,6 +670,7 @@
         ["/api/metrics/memory", renderMemory, 500, 3000],
         ["/api/metrics/gpu", renderGpu, 500, 5000],
         ["/api/metrics/disks", renderDiskMetrics, 60000, 5000],
+        ["/api/tokens", renderTokenUsage, 60000, 10000],
         ["/api/rules", renderRules, 60000, 10000],
       ];
 

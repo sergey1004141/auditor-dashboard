@@ -2,6 +2,7 @@
 import { ProjectMonitor } from "./core/ProjectMonitor.js";
 import { RulesMonitor } from "./core/RulesMonitor.js";
 import { SystemStatusService } from "./core/SystemStatusService.js";
+import { TokenUsageService } from "./core/TokenUsageService.js";
 import { McpStdioServer } from "./mcp/McpStdioServer.js";
 import { ToolRegistry } from "./mcp/ToolRegistry.js";
 import { DashboardServer } from "./web/DashboardServer.js";
@@ -21,7 +22,12 @@ await projectMonitor.initialize();
 const rulesMonitor = new RulesMonitor();
 await rulesMonitor.initialize();
 
-const toolRegistry = new ToolRegistry(projectMonitor, new SystemStatusService(), rulesMonitor);
+const toolRegistry = new ToolRegistry(
+  projectMonitor,
+  new SystemStatusService(),
+  rulesMonitor,
+  new TokenUsageService(),
+);
 
 process.on("SIGINT", () => {
   projectMonitor.stopWatcher();

@@ -121,6 +121,11 @@ export class DashboardServer {
         return;
       }
 
+      if (request.method === "GET" && url.pathname === "/api/tokens") {
+        this.sendJson(response, 200, await this.callToolJson("token_usage", {}));
+        return;
+      }
+
       if (request.method === "GET") {
         await this.staticFiles.serve(response, url.pathname);
         return;
