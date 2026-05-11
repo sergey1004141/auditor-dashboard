@@ -463,9 +463,7 @@
               <div class="rules-chip"><strong>Статус</strong><span id="rulesStatus">-</span></div>
               <div class="rules-chip"><strong>Файлы</strong><span id="rulesFiles">-</span></div>
               <div class="rules-chip"><strong>Изменения</strong><span id="rulesChanges">-</span></div>
-              <div class="rules-chip"><strong>Роль</strong><span id="rulesRoleView">Developer</span></div>
             </div>
-            <div class="detail" id="rulesNote"></div>
             <div class="rules-list" id="rulesFindings"></div>
           </div>
         </article>
@@ -651,14 +649,12 @@
       function renderRules(status) {
         $("rulesStatus").textContent = status.status || "-";
         $("rulesFiles").textContent = status.trackedFiles ?? "-";
-        $("rulesRoleView").textContent = status.role || "Developer";
         if (status.rulesFile || status.rulesPath) $("rulesPath").value = status.rulesFile || status.rulesPath;
         if (status.role) $("rulesRole").value = status.role;
 
         const changes = status.changes || { added: [], modified: [], deleted: [] };
         const changeCount = changes.added.length + changes.modified.length + changes.deleted.length;
         $("rulesChanges").textContent = changeCount;
-        $("rulesNote").textContent = status.error || status.accessNote || status.message || "";
 
         const list = $("rulesFindings");
         list.innerHTML = "";
