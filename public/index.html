@@ -480,17 +480,23 @@
         }
       }
 
+      function stopRulesAlert() {
+        lastRulesAlertKey = "";
+        lastRulesAlertAt = 0;
+        if (rulesAlertTimer) {
+          clearInterval(rulesAlertTimer);
+          rulesAlertTimer = null;
+        }
+      }
+
       function signalRulesChanges(findings) {
-        if (!findings.length) {
-          lastRulesAlertKey = "";
-          if (rulesAlertTimer) {
-            clearInterval(rulesAlertTimer);
-            rulesAlertTimer = null;
-          }
+        const criticalFindings = findings.filter((finding) => finding.severity === "critical");
+        if (!criticalFindings.length) {
+          stopRulesAlert();
           return;
         }
 
-        const key = findings
+        const key = criticalFindings
           .map((finding) => [finding.severity, finding.type, finding.file, finding.line, finding.text].join(":"))
           .join("|");
         if (!rulesAlertTimer) {
@@ -595,7 +601,11 @@
         const list = $("rulesFindings");
         list.innerHTML = "";
         const findings = Array.isArray(status.findings) ? status.findings.slice(0, 10) : [];
-        signalRulesChanges(findings);
+        if (status.status === "critical") {
+          signalRulesChanges(findings);
+        } else {
+          stopRulesAlert();
+        }
         if (findings.length === 0) {
           const empty = document.createElement("div");
           empty.className = "detail";
