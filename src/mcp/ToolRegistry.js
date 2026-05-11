@@ -174,13 +174,16 @@ export class ToolRegistry {
               type: "string",
               description: "Local or UNC path to a folder with rule files.",
             },
+            rulesFile: {
+              type: "string",
+              description: "Local or UNC path to one exact rule file.",
+            },
             role: {
               type: "string",
               description: "Role name for this rules set, for example Developer.",
               default: "Developer",
             },
           },
-          required: ["rulesPath"],
           additionalProperties: false,
         },
       },
@@ -245,7 +248,9 @@ export class ToolRegistry {
           }),
         );
       case "configure_rules_monitor":
-        return this.result(await this.requireRulesMonitor().configure(args.rulesPath, args.role));
+        return this.result(
+          await this.requireRulesMonitor().configure(args.rulesPath, args.role, args.rulesFile),
+        );
       case "rules_status":
         return this.result(
           await this.requireRulesMonitor().status({

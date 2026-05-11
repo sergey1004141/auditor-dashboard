@@ -117,7 +117,7 @@ if (!systemPayload.computerName) {
 
 await send("tools/call", {
   name: "configure_rules_monitor",
-  arguments: { rulesPath: fixture, role: "Developer" },
+  arguments: { rulesFile: path.join(fixture, "developer-rules.md"), role: "Developer" },
 });
 
 const rulesStatus = await send("tools/call", {

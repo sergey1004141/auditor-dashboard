@@ -4,6 +4,7 @@ $serviceName = "AuditorDashboard"
 $displayName = "Auditor Dashboard"
 $projectRoot = "C:\projects"
 $serverPath = Join-Path $projectRoot "src\server.js"
+$serviceRunnerPath = Join-Path $projectRoot "scripts\run-dashboard-service.ps1"
 $nodePath = "C:\Program Files\nodejs\node.exe"
 $logDir = Join-Path $projectRoot "logs"
 $binDir = Join-Path $projectRoot "bin"
@@ -21,6 +22,10 @@ if (-not (Test-Path $nodePath)) {
 
 if (-not (Test-Path $serverPath)) {
   throw "Dashboard server was not found at $serverPath"
+}
+
+if (-not (Test-Path $serviceRunnerPath)) {
+  throw "Dashboard service runner was not found at $serviceRunnerPath"
 }
 
 if (-not (Test-Path $stableNssmPath)) {
@@ -53,7 +58,7 @@ foreach ($connection in $connections) {
   }
 }
 
-& $stableNssmPath install $serviceName $nodePath $serverPath "--web" "--host" "0.0.0.0" "--port" "3777" "--allow-subnet" "192.168.1." | Out-Null
+& $stableNssmPath install $serviceName "powershell.exe" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" $serviceRunnerPath | Out-Null
 & $stableNssmPath set $serviceName DisplayName $displayName | Out-Null
 & $stableNssmPath set $serviceName Description "Auditor system dashboard HTTP server for the local 192.168.1.x subnet." | Out-Null
 & $stableNssmPath set $serviceName AppDirectory $projectRoot | Out-Null

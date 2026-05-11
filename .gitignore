@@ -5,6 +5,8 @@ logs/
 
 # Local service/runtime binaries
 bin/
+secrets/
+*.secret.json
 
 # Windows profile generated state
 windows-server-profile/logs/

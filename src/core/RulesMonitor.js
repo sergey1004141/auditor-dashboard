@@ -6,13 +6,14 @@ import { ConfigStore } from "./ConfigStore.js";
 
 const { mkdir, readFile, readdir, stat, writeFile } = fs;
 
-const RULE_EXTENSIONS = new Set([".md", ".txt", ".json", ".yaml", ".yml"]);
+const RULE_EXTENSIONS = new Set([".md", ".txt", ".json", ".yaml", ".yml", ".rules"]);
 const MAX_RULE_FILES = 500;
 const MAX_RULE_FILE_BYTES = 300000;
 
 export class RulesMonitor {
   constructor({
     initialRulesPath = process.env.AUDITOR_RULES_PATH,
+    initialRulesFile = process.env.AUDITOR_RULES_FILE,
     initialRole = process.env.AUDITOR_RULES_ROLE ?? "Developer",
     configStore = new ConfigStore({
       disabled: process.env.PROJECT_WATCH_DISABLE_CONFIG === "1",
@@ -20,6 +21,7 @@ export class RulesMonitor {
     baselineFile = RULES_BASELINE_FILE,
   } = {}) {
     this.rulesPath = initialRulesPath ? path.resolve(initialRulesPath) : null;
+    this.rulesFile = initialRulesFile ? path.resolve(initialRulesFile) : null;
     this.rulesRole = initialRole;
     this.rulesConfiguredAt = null;
     this.configStore = configStore;
@@ -30,19 +32,25 @@ export class RulesMonitor {
     await this.loadConfig();
   }
 
-  async configure(rulesPath, role = this.rulesRole) {
-    if (!rulesPath || typeof rulesPath !== "string") {
-      throw new Error("rulesPath is required.");
+  async configure(rulesPath, role = this.rulesRole, rulesFile = null) {
+    if (rulesFile && typeof rulesFile === "string") {
+      this.rulesFile = path.resolve(rulesFile);
+      this.rulesPath = null;
+    } else if (rulesPath && typeof rulesPath === "string") {
+      this.rulesPath = path.resolve(rulesPath);
+      this.rulesFile = null;
+    } else {
+      throw new Error("rulesPath or rulesFile is required.");
     }
 
-    this.rulesPath = path.resolve(rulesPath);
     this.rulesRole = typeof role === "string" && role.trim() ? role.trim() : "Developer";
     this.rulesConfiguredAt = new Date().toISOString();
-    await this.ensureRulesPath();
+    await this.ensureSource();
     const scan = await this.scanRules();
     await this.saveBaseline(scan.files);
     await this.configStore.save({
       rulesPath: this.rulesPath,
+      rulesFile: this.rulesFile,
       rulesRole: this.rulesRole,
       rulesConfiguredAt: this.rulesConfiguredAt,
     });
@@ -50,6 +58,7 @@ export class RulesMonitor {
     return {
       ok: true,
       rulesPath: this.rulesPath,
+      rulesFile: this.rulesFile,
       role: this.rulesRole,
       trackedFiles: scan.files.length,
       configuredAt: this.rulesConfiguredAt,
@@ -59,17 +68,17 @@ export class RulesMonitor {
 
   async status({ updateBaseline = true } = {}) {
     await this.loadConfig();
-    if (!this.rulesPath) {
+    if (!this.rulesPath && !this.rulesFile) {
       return {
         configured: false,
         status: "not-configured",
         role: this.rulesRole,
-        message: "Путь к папке правил не настроен.",
+        message: "Путь к файлу правил не настроен.",
       };
     }
 
     try {
-      await this.ensureRulesPath();
+      await this.ensureSource();
       const previous = await this.loadBaseline();
       const scan = await this.scanRules();
       const changes = this.compare(previous.files ?? [], scan.files);
@@ -83,6 +92,7 @@ export class RulesMonitor {
         configured: true,
         status: this.statusFromFindings(findings, changes),
         rulesPath: this.rulesPath,
+        rulesFile: this.rulesFile,
         role: this.rulesRole,
         sampledAt: new Date().toISOString(),
         trackedFiles: scan.files.length,
@@ -95,6 +105,7 @@ export class RulesMonitor {
         configured: true,
         status: "error",
         rulesPath: this.rulesPath,
+        rulesFile: this.rulesFile,
         role: this.rulesRole,
         sampledAt: new Date().toISOString(),
         error: error.message,
@@ -108,19 +119,31 @@ export class RulesMonitor {
     const config = await this.configStore.load();
     if (config.rulesPath) {
       this.rulesPath = config.rulesPath;
-      this.rulesRole = config.rulesRole ?? this.rulesRole;
-      this.rulesConfiguredAt = config.rulesConfiguredAt ?? null;
     }
+    if (config.rulesFile) {
+      this.rulesFile = config.rulesFile;
+      this.rulesPath = null;
+    }
+    this.rulesRole = config.rulesRole ?? this.rulesRole;
+    this.rulesConfiguredAt = config.rulesConfiguredAt ?? null;
   }
 
-  async ensureRulesPath() {
-    const info = await stat(this.rulesPath);
+  async ensureSource() {
+    const source = this.rulesFile ?? this.rulesPath;
+    const info = await stat(source);
+    if (this.rulesFile && !info.isFile()) {
+      throw new Error(`Путь правил не является файлом: ${this.rulesFile}`);
+    }
     if (!info.isDirectory()) {
-      throw new Error(`Путь правил не является папкой: ${this.rulesPath}`);
+      if (this.rulesPath) throw new Error(`Путь правил не является папкой: ${this.rulesPath}`);
     }
   }
 
   async scanRules(current = this.rulesPath, result = { files: [], documents: [] }) {
+    if (this.rulesFile) {
+      return this.scanRuleFile(this.rulesFile, path.basename(this.rulesFile), result);
+    }
+
     const entries = await readdir(current, { withFileTypes: true });
 
     for (const entry of entries) {
@@ -138,32 +161,37 @@ export class RulesMonitor {
         throw new Error(`Слишком много файлов правил. Лимит: ${MAX_RULE_FILES}.`);
       }
 
-      const info = await stat(absolute);
-      if (info.size > MAX_RULE_FILE_BYTES) {
-        result.files.push({
-          file: relative,
-          size: info.size,
-          mtimeMs: info.mtimeMs,
-          skipped: "too-large",
-        });
-        continue;
-      }
+      await this.scanRuleFile(absolute, relative, result);
+    }
 
-      const text = await readFile(absolute, "utf8");
-      const hash = createHash("sha256").update(text).digest("hex");
+    return result;
+  }
+
+  async scanRuleFile(absolute, relative, result) {
+    const info = await stat(absolute);
+    if (info.size > MAX_RULE_FILE_BYTES) {
       result.files.push({
         file: relative,
         size: info.size,
         mtimeMs: info.mtimeMs,
-        hash,
+        skipped: "too-large",
       });
-      result.documents.push({
-        file: relative,
-        text,
-        lines: text.split(/\r?\n/),
-      });
+      return result;
     }
 
+    const text = await readFile(absolute, "utf8");
+    const hash = createHash("sha256").update(text).digest("hex");
+    result.files.push({
+      file: relative,
+      size: info.size,
+      mtimeMs: info.mtimeMs,
+      hash,
+    });
+    result.documents.push({
+      file: relative,
+      text,
+      lines: text.split(/\r?\n/),
+    });
     return result;
   }
 
@@ -344,8 +372,9 @@ export class RulesMonitor {
       this.baselineFile,
       JSON.stringify(
         {
-          updatedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       rulesPath: this.rulesPath,
+      rulesFile: this.rulesFile,
       role: this.rulesRole,
       files,
         },
@@ -356,7 +385,8 @@ export class RulesMonitor {
   }
 
   networkAccessNote() {
-    if (!this.rulesPath?.startsWith("\\\\")) return null;
+    const source = this.rulesFile ?? this.rulesPath;
+    if (!source?.startsWith("\\\\")) return null;
     return "UNC-путь читается учетной записью службы. Если служба работает как LocalSystem, сетевой ресурс должен разрешать доступ этой учетной записи или машине.";
   }
 }

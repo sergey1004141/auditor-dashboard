@@ -20,6 +20,7 @@ export class ConfigStore {
       return {
         projectPath: parsed.projectPath ? path.resolve(parsed.projectPath) : null,
         rulesPath: parsed.rulesPath ? path.resolve(parsed.rulesPath) : null,
+        rulesFile: parsed.rulesFile ? path.resolve(parsed.rulesFile) : null,
         rulesRole: parsed.rulesRole ?? null,
         lastConfiguredAt: parsed.lastConfiguredAt ?? null,
         rulesConfiguredAt: parsed.rulesConfiguredAt ?? null,

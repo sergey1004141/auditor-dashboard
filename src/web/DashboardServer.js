@@ -50,6 +50,7 @@ export class DashboardServer {
         const body = await this.readRequestJson(request);
         await this.sendToolResult(response, "configure_rules_monitor", {
           rulesPath: body.rulesPath,
+          rulesFile: body.rulesFile,
           role: body.role,
         });
         return;

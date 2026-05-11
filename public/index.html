@@ -378,7 +378,7 @@
           <div class="content">
             <form class="rules-config" id="rulesForm">
               <input id="rulesRole" name="role" value="Developer" placeholder="Роль" autocomplete="off" />
-              <input id="rulesPath" name="rulesPath" placeholder="\\\\PC\\share\\rules" autocomplete="off" />
+              <input id="rulesPath" name="rulesPath" placeholder="\\\\PC\\share\\rules\\developer.rules" autocomplete="off" />
               <button type="submit">Сохранить</button>
             </form>
             <div class="rules-summary">
@@ -484,7 +484,7 @@
         $("rulesStatus").textContent = status.status || "-";
         $("rulesFiles").textContent = status.trackedFiles ?? "-";
         $("rulesRoleView").textContent = status.role || "Developer";
-        if (status.rulesPath) $("rulesPath").value = status.rulesPath;
+        if (status.rulesFile || status.rulesPath) $("rulesPath").value = status.rulesFile || status.rulesPath;
         if (status.role) $("rulesRole").value = status.role;
 
         const changes = status.changes || { added: [], modified: [], deleted: [] };
@@ -498,7 +498,7 @@
         if (findings.length === 0) {
           const empty = document.createElement("div");
           empty.className = "detail";
-          empty.textContent = status.configured === false ? "Укажите сетевую папку с правилами." : "Критичных находок нет.";
+          empty.textContent = status.configured === false ? "Укажите сетевой файл с правилами." : "Критичных находок нет.";
           list.append(empty);
           return;
         }
@@ -551,7 +551,7 @@
         if (!rulesPath) return;
         await request("/api/rules/configure", {
           method: "POST",
-          body: JSON.stringify({ rulesPath, role }),
+          body: JSON.stringify({ rulesFile: rulesPath, role }),
           headers: { "content-type": "application/json" },
         });
         await refreshWidget("/api/rules", renderRules, 10000);
