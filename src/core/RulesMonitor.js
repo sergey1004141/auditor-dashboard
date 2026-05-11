@@ -101,6 +101,7 @@ export class RulesMonitor {
         accessNote: this.networkAccessNote(),
       };
     } catch (error) {
+      const source = this.rulesFile ?? this.rulesPath;
       return {
         configured: true,
         status: "error",
@@ -109,6 +110,17 @@ export class RulesMonitor {
         role: this.rulesRole,
         sampledAt: new Date().toISOString(),
         error: error.message,
+        changes: { added: [], modified: [], deleted: [] },
+        findings: [
+          {
+            severity: "critical",
+            type: "access",
+            file: source,
+            message: `Файл правил недоступен: ${error.message}`,
+            text: source,
+            suggestion: "Проверить сетевой путь, доступ учетной записи службы и доступность машины с файлом правил.",
+          },
+        ],
         accessNote: this.networkAccessNote(),
       };
     }

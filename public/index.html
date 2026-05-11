@@ -708,7 +708,8 @@
         const list = $("rulesFindings");
         list.innerHTML = "";
         const findings = Array.isArray(status.findings) ? status.findings.slice(0, 10) : [];
-        if (status.status === "critical") {
+        const criticalFindings = findings.filter((finding) => finding.severity === "critical");
+        if (criticalFindings.length) {
           signalRulesChanges(findings);
         } else {
           stopRulesAlert();
@@ -716,7 +717,7 @@
         if (findings.length === 0) {
           const empty = document.createElement("div");
           empty.className = "detail";
-          empty.textContent = status.configured === false ? "Укажите сетевой файл с правилами." : "Критичных находок нет.";
+          empty.textContent = status.error || (status.configured === false ? "Укажите сетевой файл с правилами." : "Критичных находок нет.");
           list.append(empty);
           return;
         }
