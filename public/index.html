@@ -688,7 +688,7 @@
       function renderLimit(prefix, limit, fallbackLabel) {
         $(`${prefix}Label`).textContent = limit?.label || fallbackLabel;
         $(`${prefix}Percent`).textContent = limit?.remainingPercentFormatted || "-";
-        $(`${prefix}Reset`).textContent = limit?.resetsIn || "-";
+        $(`${prefix}Reset`).textContent = limit?.resetsAtTime || "-";
       }
 
       function renderLimits(rateLimits) {

@@ -183,6 +183,7 @@ export class TokenUsageService {
       windowMinutes: limit.window_minutes ?? null,
       label: this.formatWindowLabel(limit.window_minutes),
       resetsAt: resetsAt ? resetsAt.toISOString() : null,
+      resetsAtTime: this.formatClock(resetsAt),
       resetsIn: this.formatRemaining(resetsAt),
     };
   }
@@ -202,6 +203,11 @@ export class TokenUsageService {
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  }
+
+  formatClock(target) {
+    if (!target) return null;
+    return `${String(target.getHours()).padStart(2, "0")}:${String(target.getMinutes()).padStart(2, "0")}`;
   }
 
   normalizeUsage(usage = {}) {
