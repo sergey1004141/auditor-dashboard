@@ -68,7 +68,7 @@ export class TokenUsageService {
       available: true,
       sampledAt: latest.timestamp.toISOString(),
       percent: visible?.usedPercent ?? null,
-      percentFormatted: visible ? `${visible.usedPercent.toFixed(3)}%` : "n/a",
+      percentFormatted: visible ? `${Math.round(visible.usedPercent)}%` : "n/a",
       percentSource: primary ? "primary" : secondary ? "secondary" : null,
       note: primary?.windowMinutes === 1440
         ? "Дневной лимит из Codex token_count."
@@ -177,9 +177,9 @@ export class TokenUsageService {
     const resetsAt = limit.resets_at ? new Date(limit.resets_at * 1000) : null;
     return {
       usedPercent,
-      usedPercentFormatted: `${usedPercent.toFixed(3)}%`,
+      usedPercentFormatted: `${Math.round(usedPercent)}%`,
       remainingPercent,
-      remainingPercentFormatted: `${remainingPercent.toFixed(3)}%`,
+      remainingPercentFormatted: `${Math.round(remainingPercent)}%`,
       windowMinutes: limit.window_minutes ?? null,
       label: this.formatWindowLabel(limit.window_minutes),
       resetsAt: resetsAt ? resetsAt.toISOString() : null,
