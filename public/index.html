@@ -220,21 +220,23 @@
 
       .help-tooltip {
         position: relative;
-        width: 24px;
-        height: 24px;
+        width: 26px;
+        height: 26px;
         border: 1px solid var(--line);
         border-radius: 999px;
-        background: #fbfcfe;
+        background: #ffffff;
         color: var(--accent);
         display: inline-grid;
         place-items: center;
         cursor: help;
         flex: 0 0 auto;
+        padding: 0;
       }
 
       .help-tooltip svg {
-        width: 15px;
-        height: 15px;
+        width: 17px;
+        height: 17px;
+        display: block;
       }
 
       .help-tooltip::after {
@@ -518,8 +520,9 @@
               data-tooltip="UNC-путь читается учетной записью службы. Если служба работает как LocalSystem, сетевой ресурс должен разрешать доступ этой учетной записи или машине."
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 17h.01M12 14a3 3 0 1 0-3-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" />
+                <path d="M9.1 9a3 3 0 0 1 5.83 1c0 2-3 2.4-3 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M12 17h.01" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
               </svg>
             </button>
           </header>
