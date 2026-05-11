@@ -432,10 +432,10 @@
               <div class="rules-chip">
                 <strong>Звук</strong>
                 <select id="rulesSoundPreset">
-                  <option value="soft">Мягкий</option>
-                  <option value="double">Двойной</option>
-                  <option value="alarm">Тревога</option>
-                  <option value="short">Короткий</option>
+                  <option value="chime">Колокольчик</option>
+                  <option value="major">Мажор</option>
+                  <option value="arpeggio">Арпеджио</option>
+                  <option value="calm">Спокойный</option>
                   <option value="mute">Без звука</option>
                 </select>
                 <button type="button" id="rulesSound">Тест</button>
@@ -450,43 +450,49 @@
 
     <script>
       const $ = (id) => document.getElementById(id);
-      let soundPreset = localStorage.getItem("auditorRulesSoundPreset") || "soft";
+      let soundPreset = localStorage.getItem("auditorRulesSoundPreset") || "chime";
       let audioContext = null;
       let lastRulesAlertKey = "";
       let lastRulesAlertAt = 0;
       let rulesAlertTimer = null;
       const RULE_ALERT_INTERVAL_MS = 3000;
       const SOUND_PRESETS = {
-        soft: {
+        chime: {
           wave: "sine",
+          volume: 0.22,
+          notes: [
+            [659, 0, 0.18],
+            [987, 0.12, 0.32],
+            [1318, 0.28, 0.38],
+          ],
+        },
+        major: {
+          wave: "triangle",
           volume: 0.2,
           notes: [
-            [523, 0, 0.14],
-            [659, 0.16, 0.18],
+            [523, 0, 0.26],
+            [659, 0.06, 0.28],
+            [784, 0.12, 0.32],
+            [1046, 0.24, 0.36],
           ],
         },
-        double: {
-          wave: "triangle",
-          volume: 0.28,
-          notes: [
-            [740, 0, 0.09],
-            [740, 0.18, 0.09],
-          ],
-        },
-        alarm: {
-          wave: "square",
-          volume: 0.26,
-          notes: [
-            [880, 0, 0.16],
-            [660, 0.17, 0.16],
-            [880, 0.34, 0.16],
-          ],
-        },
-        short: {
+        arpeggio: {
           wave: "sine",
-          volume: 0.32,
+          volume: 0.24,
           notes: [
-            [980, 0, 0.18],
+            [440, 0, 0.16],
+            [554, 0.12, 0.16],
+            [659, 0.24, 0.18],
+            [880, 0.38, 0.28],
+          ],
+        },
+        calm: {
+          wave: "sine",
+          volume: 0.18,
+          notes: [
+            [392, 0, 0.3],
+            [523, 0.18, 0.34],
+            [659, 0.38, 0.42],
           ],
         },
       };
@@ -518,7 +524,7 @@
         try {
           const context = await ensureAudio();
           if (!context) return;
-          const preset = SOUND_PRESETS[soundPreset] || SOUND_PRESETS.soft;
+          const preset = SOUND_PRESETS[soundPreset] || SOUND_PRESETS.chime;
           for (const [frequency, offset, duration] of preset.notes) {
             const oscillator = context.createOscillator();
             const gain = context.createGain();
