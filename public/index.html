@@ -206,8 +206,64 @@
         border-bottom: 1px solid var(--line);
       }
 
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        position: relative;
+      }
+
       .panel h2 {
         font-size: 13px;
+      }
+
+      .help-tooltip {
+        position: relative;
+        width: 24px;
+        height: 24px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #fbfcfe;
+        color: var(--accent);
+        display: inline-grid;
+        place-items: center;
+        cursor: help;
+        flex: 0 0 auto;
+      }
+
+      .help-tooltip svg {
+        width: 15px;
+        height: 15px;
+      }
+
+      .help-tooltip::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        right: 0;
+        top: calc(100% + 7px);
+        width: min(520px, calc(100vw - 36px));
+        padding: 9px 11px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        color: #172133;
+        box-shadow: var(--shadow);
+        font-size: 12px;
+        line-height: 1.35;
+        text-align: left;
+        white-space: normal;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-4px);
+        transition: opacity 120ms ease, transform 120ms ease;
+        z-index: 20;
+      }
+
+      .help-tooltip:hover::after,
+      .help-tooltip:focus-visible::after {
+        opacity: 1;
+        transform: translateY(0);
       }
 
       .content {
@@ -453,7 +509,20 @@
           <div class="content disk-list" id="diskList"></div>
         </article>
         <article class="panel">
-          <header><h2>Правила ИИ</h2></header>
+          <header class="panel-header">
+            <h2>Правила ИИ</h2>
+            <button
+              class="help-tooltip"
+              type="button"
+              aria-label="Подсказка по UNC-пути"
+              data-tooltip="UNC-путь читается учетной записью службы. Если служба работает как LocalSystem, сетевой ресурс должен разрешать доступ этой учетной записи или машине."
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 17h.01M12 14a3 3 0 1 0-3-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+              </svg>
+            </button>
+          </header>
           <div class="content">
             <form class="rules-config" id="rulesForm">
               <input id="rulesRole" name="role" value="Developer" placeholder="Роль" autocomplete="off" />
