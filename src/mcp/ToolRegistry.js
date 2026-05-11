@@ -1,7 +1,8 @@
 export class ToolRegistry {
-  constructor(projectMonitor, systemStatusService = null) {
+  constructor(projectMonitor, systemStatusService = null, rulesMonitor = null) {
     this.projectMonitor = projectMonitor;
     this.systemStatusService = systemStatusService;
+    this.rulesMonitor = rulesMonitor;
   }
 
   list() {
@@ -163,6 +164,37 @@ export class ToolRegistry {
           additionalProperties: false,
         },
       },
+      {
+        name: "configure_rules_monitor",
+        description: "Configure a folder with AI role rules for contradiction and loophole monitoring.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            rulesPath: {
+              type: "string",
+              description: "Local or UNC path to a folder with rule files.",
+            },
+            role: {
+              type: "string",
+              description: "Role name for this rules set, for example Developer.",
+              default: "Developer",
+            },
+          },
+          required: ["rulesPath"],
+          additionalProperties: false,
+        },
+      },
+      {
+        name: "rules_status",
+        description: "Return current AI rules monitoring status, changed files, contradictions, and loopholes.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            updateBaseline: { type: "boolean", default: true },
+          },
+          additionalProperties: false,
+        },
+      },
     ];
   }
 
@@ -212,6 +244,14 @@ export class ToolRegistry {
             maxEvents: args.maxEvents ?? 30,
           }),
         );
+      case "configure_rules_monitor":
+        return this.result(await this.requireRulesMonitor().configure(args.rulesPath, args.role));
+      case "rules_status":
+        return this.result(
+          await this.requireRulesMonitor().status({
+            updateBaseline: args.updateBaseline !== false,
+          }),
+        );
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
@@ -222,6 +262,13 @@ export class ToolRegistry {
       throw new Error("System status service is not configured.");
     }
     return this.systemStatusService;
+  }
+
+  requireRulesMonitor() {
+    if (!this.rulesMonitor) {
+      throw new Error("Rules monitor is not configured.");
+    }
+    return this.rulesMonitor;
   }
 
   result(value) {

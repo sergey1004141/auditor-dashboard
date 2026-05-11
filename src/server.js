@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { ProjectMonitor } from "./core/ProjectMonitor.js";
+import { RulesMonitor } from "./core/RulesMonitor.js";
 import { SystemStatusService } from "./core/SystemStatusService.js";
 import { McpStdioServer } from "./mcp/McpStdioServer.js";
 import { ToolRegistry } from "./mcp/ToolRegistry.js";
@@ -17,8 +18,10 @@ function readOption(name, fallback) {
 
 const projectMonitor = new ProjectMonitor();
 await projectMonitor.initialize();
+const rulesMonitor = new RulesMonitor();
+await rulesMonitor.initialize();
 
-const toolRegistry = new ToolRegistry(projectMonitor, new SystemStatusService());
+const toolRegistry = new ToolRegistry(projectMonitor, new SystemStatusService(), rulesMonitor);
 
 process.on("SIGINT", () => {
   projectMonitor.stopWatcher();

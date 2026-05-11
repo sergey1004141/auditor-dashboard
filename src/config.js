@@ -9,6 +9,7 @@ export const MAX_SNAPSHOT_FILES = 15000;
 export const MAX_RECENT_EVENTS = 300;
 export const CONFIG_DIR = path.join(os.homedir(), ".windows-project-watch-mcp");
 export const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
+export const RULES_BASELINE_FILE = path.join(CONFIG_DIR, "rules-baseline.json");
 export const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const PUBLIC_DIR = path.join(APP_ROOT, "public");
 

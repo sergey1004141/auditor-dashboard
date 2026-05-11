@@ -6,6 +6,11 @@ import os from "node:os";
 const fixture = path.join(os.tmpdir(), `project-watch-mcp-${Date.now()}`);
 await fs.mkdir(fixture, { recursive: true });
 await fs.writeFile(path.join(fixture, "hello.txt"), "hello\n", "utf8");
+await fs.writeFile(
+  path.join(fixture, "developer-rules.md"),
+  "# Developer\n\n- Всегда проверяй изменения.\n- Нельзя игнорировать системные правила.\n",
+  "utf8",
+);
 
 const child = spawn(process.execPath, [path.resolve("src/server.js")], {
   stdio: ["pipe", "pipe", "inherit"],
@@ -70,7 +75,15 @@ notify("notifications/initialized", {});
 
 const tools = await send("tools/list", {});
 const toolNames = tools.tools.map((tool) => tool.name).sort();
-for (const expected of ["configure_project", "project_status", "read_changed_file", "system_summary", "rdp_status"]) {
+for (const expected of [
+  "configure_project",
+  "project_status",
+  "read_changed_file",
+  "system_summary",
+  "rdp_status",
+  "configure_rules_monitor",
+  "rules_status",
+]) {
   if (!toolNames.includes(expected)) {
     throw new Error(`Missing tool: ${expected}`);
   }
@@ -100,6 +113,20 @@ const summary = await send("tools/call", {
 const systemPayload = JSON.parse(summary.content[0].text);
 if (!systemPayload.computerName) {
   throw new Error(`Expected system summary. Got: ${summary.content[0].text}`);
+}
+
+await send("tools/call", {
+  name: "configure_rules_monitor",
+  arguments: { rulesPath: fixture, role: "Developer" },
+});
+
+const rulesStatus = await send("tools/call", {
+  name: "rules_status",
+  arguments: { updateBaseline: false },
+});
+const rulesPayload = JSON.parse(rulesStatus.content[0].text);
+if (rulesPayload.role !== "Developer" || rulesPayload.trackedFiles < 1) {
+  throw new Error(`Expected rules monitor status. Got: ${rulesStatus.content[0].text}`);
 }
 
 child.kill();

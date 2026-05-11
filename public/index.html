@@ -198,6 +198,81 @@
         gap: 6px;
       }
 
+      .rules-config {
+        display: grid;
+        grid-template-columns: 120px minmax(180px, 1fr) auto;
+        gap: 6px;
+      }
+
+      .rules-config input,
+      .rules-config button {
+        height: 30px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        font: inherit;
+        font-size: 12px;
+      }
+
+      .rules-config input {
+        min-width: 0;
+        padding: 0 8px;
+      }
+
+      .rules-config button {
+        padding: 0 12px;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 800;
+        cursor: pointer;
+      }
+
+      .rules-summary {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(100px, 1fr));
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .rules-chip {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 6px 8px;
+        background: #fbfcfe;
+        font-size: 12px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .rules-chip strong {
+        margin-right: 5px;
+      }
+
+      .rules-list {
+        display: grid;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .finding {
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--warn);
+        border-radius: 6px;
+        padding: 6px 8px;
+        background: #fffaf2;
+        font-size: 12px;
+      }
+
+      .finding.critical {
+        border-left-color: var(--bad);
+        background: #fff5f5;
+      }
+
+      .finding .detail {
+        margin-top: 3px;
+        white-space: normal;
+      }
+
       .disk,
       .service {
         border: 1px solid var(--line);
@@ -298,6 +373,24 @@
           <header><h2>Disks</h2></header>
           <div class="content disk-list" id="diskList"></div>
         </article>
+        <article class="panel">
+          <header><h2>Правила ИИ</h2></header>
+          <div class="content">
+            <form class="rules-config" id="rulesForm">
+              <input id="rulesRole" name="role" value="Developer" placeholder="Роль" autocomplete="off" />
+              <input id="rulesPath" name="rulesPath" placeholder="\\\\PC\\share\\rules" autocomplete="off" />
+              <button type="submit">Сохранить</button>
+            </form>
+            <div class="rules-summary">
+              <div class="rules-chip"><strong>Статус</strong><span id="rulesStatus">-</span></div>
+              <div class="rules-chip"><strong>Файлы</strong><span id="rulesFiles">-</span></div>
+              <div class="rules-chip"><strong>Изменения</strong><span id="rulesChanges">-</span></div>
+              <div class="rules-chip"><strong>Роль</strong><span id="rulesRoleView">Developer</span></div>
+            </div>
+            <div class="detail" id="rulesNote"></div>
+            <div class="rules-list" id="rulesFindings"></div>
+          </div>
+        </article>
       </section>
     </main>
 
@@ -316,11 +409,13 @@
         bar.className = `bar-fill ${pctClass(percent)}`;
       }
 
-      async function request(url, timeoutMs = 10000) {
+      async function request(url, optionsOrTimeoutMs = 10000) {
+        const options = typeof optionsOrTimeoutMs === "number" ? {} : optionsOrTimeoutMs;
+        const timeoutMs = typeof optionsOrTimeoutMs === "number" ? optionsOrTimeoutMs : (options.timeoutMs ?? 10000);
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), timeoutMs);
         try {
-          const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
+          const response = await fetch(url, { ...options, signal: controller.signal, cache: "no-store" });
           const body = await response.json();
           if (!response.ok) throw new Error(body.error || response.statusText);
           return body;
@@ -385,6 +480,43 @@
         renderDisks(disks);
       }
 
+      function renderRules(status) {
+        $("rulesStatus").textContent = status.status || "-";
+        $("rulesFiles").textContent = status.trackedFiles ?? "-";
+        $("rulesRoleView").textContent = status.role || "Developer";
+        if (status.rulesPath) $("rulesPath").value = status.rulesPath;
+        if (status.role) $("rulesRole").value = status.role;
+
+        const changes = status.changes || { added: [], modified: [], deleted: [] };
+        const changeCount = changes.added.length + changes.modified.length + changes.deleted.length;
+        $("rulesChanges").textContent = changeCount;
+        $("rulesNote").textContent = status.error || status.accessNote || status.message || "";
+
+        const list = $("rulesFindings");
+        list.innerHTML = "";
+        const findings = Array.isArray(status.findings) ? status.findings.slice(0, 6) : [];
+        if (findings.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "detail";
+          empty.textContent = status.configured === false ? "Укажите сетевую папку с правилами." : "Критичных находок нет.";
+          list.append(empty);
+          return;
+        }
+
+        for (const finding of findings) {
+          const item = document.createElement("div");
+          item.className = `finding ${finding.severity === "critical" ? "critical" : ""}`;
+          const place = [finding.file, finding.line].filter(Boolean).join(":");
+          item.innerHTML = `
+            <strong></strong>
+            <div class="detail"></div>
+          `;
+          item.querySelector("strong").textContent = `${finding.severity || "info"} / ${finding.type || "rule"} / ${place}`;
+          item.querySelector(".detail").textContent = finding.message || finding.text || "";
+          list.append(item);
+        }
+      }
+
       async function refreshWidget(url, render, timeoutMs) {
         try {
           const data = await request(url, timeoutMs);
@@ -399,6 +531,7 @@
         ["/api/metrics/memory", renderMemory, 500, 3000],
         ["/api/metrics/gpu", renderGpu, 500, 5000],
         ["/api/metrics/disks", renderDiskMetrics, 60000, 5000],
+        ["/api/rules", renderRules, 15000, 10000],
       ];
 
       for (const [url, render, interval, timeoutMs] of loops) {
@@ -410,6 +543,19 @@
         };
         void tick();
       }
+
+      $("rulesForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const rulesPath = $("rulesPath").value.trim();
+        const role = $("rulesRole").value.trim() || "Developer";
+        if (!rulesPath) return;
+        await request("/api/rules/configure", {
+          method: "POST",
+          body: JSON.stringify({ rulesPath, role }),
+          headers: { "content-type": "application/json" },
+        });
+        await refreshWidget("/api/rules", renderRules, 10000);
+      });
     </script>
   </body>
 </html>

@@ -19,24 +19,30 @@ export class ConfigStore {
       const parsed = JSON.parse(raw);
       return {
         projectPath: parsed.projectPath ? path.resolve(parsed.projectPath) : null,
+        rulesPath: parsed.rulesPath ? path.resolve(parsed.rulesPath) : null,
+        rulesRole: parsed.rulesRole ?? null,
         lastConfiguredAt: parsed.lastConfiguredAt ?? null,
+        rulesConfiguredAt: parsed.rulesConfiguredAt ?? null,
       };
     } catch {
       return {};
     }
   }
 
-  async save({ projectPath, lastConfiguredAt }) {
+  async save(nextConfig) {
     if (this.disabled) return;
+
+    const current = await this.load();
+    const merged = {
+      ...current,
+      ...nextConfig,
+    };
 
     await mkdir(this.configDir, { recursive: true });
     await writeFile(
       this.configFile,
       JSON.stringify(
-        {
-          projectPath,
-          lastConfiguredAt,
-        },
+        merged,
         null,
         2,
       ),

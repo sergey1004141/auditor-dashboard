@@ -46,6 +46,15 @@ export class DashboardServer {
         return;
       }
 
+      if (request.method === "POST" && url.pathname === "/api/rules/configure") {
+        const body = await this.readRequestJson(request);
+        await this.sendToolResult(response, "configure_rules_monitor", {
+          rulesPath: body.rulesPath,
+          role: body.role,
+        });
+        return;
+      }
+
       if (request.method === "GET" && url.pathname === "/api/status") {
         await this.sendToolResult(response, "project_status", {
           includeGit: url.searchParams.get("git") !== "false",
@@ -76,6 +85,13 @@ export class DashboardServer {
           this.callToolJson("recent_system_events", { hours: 24, maxEvents: 12 }),
         ]);
         this.sendJson(response, 200, { summary, services, rdp, network, power, events });
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/rules") {
+        await this.sendToolResult(response, "rules_status", {
+          updateBaseline: url.searchParams.get("baseline") !== "false",
+        });
         return;
       }
 
