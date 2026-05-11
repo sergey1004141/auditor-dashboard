@@ -461,7 +461,6 @@
             </form>
             <div class="rules-summary">
               <div class="rules-chip"><strong>Статус</strong><span id="rulesStatus">-</span></div>
-              <div class="rules-chip"><strong>Файлы</strong><span id="rulesFiles">-</span></div>
               <div class="rules-chip"><strong>Изменения</strong><span id="rulesChanges">-</span></div>
             </div>
             <div class="rules-list" id="rulesFindings"></div>
@@ -648,7 +647,6 @@
 
       function renderRules(status) {
         $("rulesStatus").textContent = status.status || "-";
-        $("rulesFiles").textContent = status.trackedFiles ?? "-";
         if (status.rulesFile || status.rulesPath) $("rulesPath").value = status.rulesFile || status.rulesPath;
         if (status.role) $("rulesRole").value = status.role;
 
