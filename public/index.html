@@ -86,7 +86,7 @@
 
       .cards {
         display: grid;
-        grid-template-columns: repeat(5, minmax(150px, 1fr));
+        grid-template-columns: repeat(6, minmax(140px, 1fr));
         gap: 8px;
       }
 
@@ -149,6 +149,29 @@
 
       .card > .detail {
         grid-column: 1 / -1;
+      }
+
+      .limits-card {
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+
+      .limit-row {
+        display: grid;
+        grid-template-columns: minmax(70px, 1fr) 48px 44px;
+        gap: 8px;
+        align-items: center;
+        font-size: 12px;
+      }
+
+      .limit-row strong {
+        font-weight: 850;
+      }
+
+      .limit-row span {
+        color: var(--muted);
+        text-align: right;
+        font-variant-numeric: tabular-nums;
       }
 
       .bar-fill {
@@ -409,6 +432,18 @@
           <div class="bar"><div class="bar-fill" id="tokenBar"></div></div>
           <div class="detail" id="tokenDetail">tokens in this dialog</div>
         </article>
+        <article class="card limits-card">
+          <div class="limit-row">
+            <strong id="limitPrimaryLabel">5ч</strong>
+            <span id="limitPrimaryPercent">-</span>
+            <span id="limitPrimaryReset">-</span>
+          </div>
+          <div class="limit-row">
+            <strong id="limitSecondaryLabel">Еженедельно</strong>
+            <span id="limitSecondaryPercent">-</span>
+            <span id="limitSecondaryReset">-</span>
+          </div>
+        </article>
       </section>
 
       <section class="grid">
@@ -620,9 +655,11 @@
           $("tokenValue").textContent = "n/a";
           $("tokenDetail").textContent = tokens.message || "no local token_count";
           setBar("tokenBar", 0);
+          renderLimits(null);
           return;
         }
 
+        renderLimits(tokens.rateLimits);
         const thread = tokens.currentThread;
         if (!thread?.available) {
           $("tokenValue").textContent = "n/a";
@@ -634,6 +671,17 @@
         $("tokenValue").textContent = thread.totalTokensFormatted || Number(thread.totalTokens ?? 0).toLocaleString("ru-RU");
         $("tokenDetail").textContent = `${Number(thread.totalTokens ?? 0).toLocaleString("ru-RU")} всего / ${thread.lastTotalTokensFormatted || "n/a"} последний ход`;
         setBar("tokenBar", 100);
+      }
+
+      function renderLimit(prefix, limit, fallbackLabel) {
+        $(`${prefix}Label`).textContent = limit?.label || fallbackLabel;
+        $(`${prefix}Percent`).textContent = limit?.usedPercentFormatted || "-";
+        $(`${prefix}Reset`).textContent = limit?.resetsIn || "-";
+      }
+
+      function renderLimits(rateLimits) {
+        renderLimit("limitPrimary", rateLimits?.primary, "5ч");
+        renderLimit("limitSecondary", rateLimits?.secondary, "Еженедельно");
       }
 
       function renderRules(status) {

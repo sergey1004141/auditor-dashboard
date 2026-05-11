@@ -172,12 +172,32 @@ export class TokenUsageService {
 
   formatLimit(limit) {
     if (!limit || typeof limit.used_percent !== "number") return null;
+    const resetsAt = limit.resets_at ? new Date(limit.resets_at * 1000) : null;
     return {
       usedPercent: limit.used_percent,
       usedPercentFormatted: `${limit.used_percent.toFixed(3)}%`,
       windowMinutes: limit.window_minutes ?? null,
-      resetsAt: limit.resets_at ? new Date(limit.resets_at * 1000).toISOString() : null,
+      label: this.formatWindowLabel(limit.window_minutes),
+      resetsAt: resetsAt ? resetsAt.toISOString() : null,
+      resetsIn: this.formatRemaining(resetsAt),
     };
+  }
+
+  formatWindowLabel(windowMinutes) {
+    if (windowMinutes === 300) return "5ч";
+    if (windowMinutes === 10080) return "Еженедельно";
+    if (windowMinutes === 1440) return "Сутки";
+    if (!windowMinutes) return "Лимит";
+    if (windowMinutes % 60 === 0) return `${windowMinutes / 60}ч`;
+    return `${windowMinutes}м`;
+  }
+
+  formatRemaining(target) {
+    if (!target) return null;
+    const totalMinutes = Math.max(0, Math.ceil((target.getTime() - Date.now()) / 60000));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
   }
 
   normalizeUsage(usage = {}) {
