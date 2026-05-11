@@ -432,16 +432,16 @@
               <div class="rules-chip">
                 <strong>Звук</strong>
                 <select id="rulesSoundPreset">
-                  <option value="guitar">Guitar alert</option>
-                  <option value="happyBell">Happy bell</option>
                   <option value="bellEcho">Bell echo</option>
-                  <option value="quickChime">Quick chime</option>
-                  <option value="flutePhone">Flute phone</option>
-                  <option value="upliftingFlute">Uplifting flute</option>
-                  <option value="announce">Announce tones</option>
-                  <option value="confirmation">Confirmation</option>
-                  <option value="interfaceStart">Interface start</option>
-                  <option value="messagePop">Message pop</option>
+                  <option value="pageForward">Page forward</option>
+                  <option value="relaxingBell">Relaxing bell</option>
+                  <option value="crystalChime">Crystal chime</option>
+                  <option value="correctTone">Correct tone</option>
+                  <option value="elevatorTone">Elevator tone</option>
+                  <option value="accessAllowed">Access allowed</option>
+                  <option value="bellNotification">Bell notification</option>
+                  <option value="achievementBell">Achievement bell</option>
+                  <option value="retroGame">Retro game</option>
                   <option value="mute">Без звука</option>
                 </select>
                 <button type="button" id="rulesSound">Тест</button>
@@ -456,23 +456,23 @@
 
     <script>
       const $ = (id) => document.getElementById(id);
-      let soundPreset = localStorage.getItem("auditorRulesSoundPreset") || "guitar";
+      let soundPreset = localStorage.getItem("auditorRulesSoundPreset") || "bellEcho";
       let currentAlertAudio = null;
       let lastRulesAlertKey = "";
       let lastRulesAlertAt = 0;
       let rulesAlertTimer = null;
       const RULE_ALERT_INTERVAL_MS = 3000;
       const ALERT_SOUNDS = {
-        guitar: "/sounds/guitar-notification-alert.mp3",
-        happyBell: "/sounds/happy-bell-alert.mp3",
         bellEcho: "/sounds/alert-bells-echo.mp3",
-        quickChime: "/sounds/alert-quick-chime.mp3",
-        flutePhone: "/sounds/flute-mobile-notification.mp3",
-        upliftingFlute: "/sounds/uplifting-flute-notification.mp3",
-        announce: "/sounds/clear-announce-tones.mp3",
-        confirmation: "/sounds/confirmation-tone.mp3",
-        interfaceStart: "/sounds/software-interface-start.mp3",
-        messagePop: "/sounds/message-pop-alert.mp3",
+        pageForward: "/sounds/page-forward-single-chime.mp3",
+        relaxingBell: "/sounds/relaxing-bell-chime.mp3",
+        crystalChime: "/sounds/crystal-chime.mp3",
+        correctTone: "/sounds/correct-answer-tone.mp3",
+        elevatorTone: "/sounds/elevator-tone.mp3",
+        accessAllowed: "/sounds/access-allowed-tone.mp3",
+        bellNotification: "/sounds/bell-notification.mp3",
+        achievementBell: "/sounds/achievement-bell.mp3",
+        retroGame: "/sounds/retro-game-notification.mp3",
       };
 
       function pctClass(value) {
@@ -483,7 +483,7 @@
 
       function updateSoundButton() {
         if (soundPreset !== "mute" && !ALERT_SOUNDS[soundPreset]) {
-          soundPreset = "guitar";
+          soundPreset = "bellEcho";
           localStorage.setItem("auditorRulesSoundPreset", soundPreset);
         }
         $("rulesSoundPreset").value = soundPreset;
@@ -496,7 +496,7 @@
         lastRulesAlertAt = now;
 
         try {
-          const source = ALERT_SOUNDS[soundPreset] || ALERT_SOUNDS.guitar;
+          const source = ALERT_SOUNDS[soundPreset] || ALERT_SOUNDS.bellEcho;
           if (currentAlertAudio) {
             currentAlertAudio.pause();
             currentAlertAudio.currentTime = 0;
