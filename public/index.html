@@ -295,6 +295,16 @@
         word-break: break-word;
       }
 
+      .finding .suggestion {
+        margin-top: 5px;
+        padding: 5px 7px;
+        border-radius: 5px;
+        background: #eef8f9;
+        color: var(--text);
+        white-space: normal;
+        word-break: break-word;
+      }
+
       .disk,
       .service {
         border: 1px solid var(--line);
@@ -423,6 +433,8 @@
       let audioContext = null;
       let lastRulesAlertKey = "";
       let lastRulesAlertAt = 0;
+      let rulesAlertTimer = null;
+      const RULE_ALERT_INTERVAL_MS = 3000;
 
       function pctClass(value) {
         if (value >= 90) return "bad";
@@ -445,7 +457,7 @@
       async function signalRulesAlert(force = false) {
         if (!soundEnabled) return;
         const now = Date.now();
-        if (!force && now - lastRulesAlertAt < 10000) return;
+        if (!force && now - lastRulesAlertAt < RULE_ALERT_INTERVAL_MS - 100) return;
         lastRulesAlertAt = now;
 
         try {
@@ -457,7 +469,7 @@
           oscillator.frequency.setValueAtTime(880, context.currentTime);
           oscillator.frequency.setValueAtTime(660, context.currentTime + 0.12);
           gain.gain.setValueAtTime(0.0001, context.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.18, context.currentTime + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.32, context.currentTime + 0.02);
           gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.32);
           oscillator.connect(gain);
           gain.connect(context.destination);
@@ -471,12 +483,21 @@
       function signalRulesChanges(findings) {
         if (!findings.length) {
           lastRulesAlertKey = "";
+          if (rulesAlertTimer) {
+            clearInterval(rulesAlertTimer);
+            rulesAlertTimer = null;
+          }
           return;
         }
 
         const key = findings
           .map((finding) => [finding.severity, finding.type, finding.file, finding.line, finding.text].join(":"))
           .join("|");
+        if (!rulesAlertTimer) {
+          rulesAlertTimer = setInterval(() => {
+            void signalRulesAlert();
+          }, RULE_ALERT_INTERVAL_MS);
+        }
         if (key === lastRulesAlertKey) return;
         lastRulesAlertKey = key;
         void signalRulesAlert();
@@ -591,12 +612,16 @@
             <strong></strong>
             <div class="detail"></div>
             <div class="quote"></div>
+            <div class="suggestion"></div>
           `;
           item.querySelector("strong").textContent = `${finding.severity || "info"} / ${finding.type || "rule"} / ${place}`;
           item.querySelector(".detail").textContent = finding.message || finding.text || "";
           item.querySelector(".quote").textContent = finding.related
             ? `${finding.text}\n↳ ${finding.related.file}:${finding.related.line}: ${finding.related.text}`
             : finding.text || "";
+          item.querySelector(".suggestion").textContent = finding.suggestion
+            ? `Предложение: ${finding.suggestion}`
+            : "Предложение: уточнить формулировку и убрать возможную лазейку.";
           list.append(item);
         }
       }
@@ -615,7 +640,7 @@
         ["/api/metrics/memory", renderMemory, 500, 3000],
         ["/api/metrics/gpu", renderGpu, 500, 5000],
         ["/api/metrics/disks", renderDiskMetrics, 60000, 5000],
-        ["/api/rules", renderRules, 15000, 10000],
+        ["/api/rules", renderRules, 60000, 10000],
       ];
 
       for (const [url, render, interval, timeoutMs] of loops) {

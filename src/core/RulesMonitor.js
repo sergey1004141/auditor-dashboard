@@ -243,6 +243,7 @@ export class RulesMonitor {
             line: index + 1,
             message: loophole,
             text,
+            suggestion: this.suggestChange("loophole", text),
           });
         }
 
@@ -255,6 +256,7 @@ export class RulesMonitor {
             line: index + 1,
             message: weakening,
             text,
+            suggestion: this.suggestChange("weakening", text),
           });
         }
       });
@@ -275,6 +277,7 @@ export class RulesMonitor {
           line: left.line,
           message: `Возможное противоречие с ${right.file}:${right.line}. Общие темы: ${overlap.slice(0, 5).join(", ")}.`,
           text: left.text,
+          suggestion: this.suggestChange("contradiction", left.text, right.text),
           related: {
             file: right.file,
             line: right.line,
@@ -285,6 +288,26 @@ export class RulesMonitor {
     }
 
     return findings.slice(0, 50);
+  }
+
+  suggestChange(type, text, relatedText = "") {
+    if (type === "contradiction") {
+      return `Свести обе записи к одному решению: оставить только приоритетное правило или явно указать, какая запись главнее. Конфликтующая запись: ${relatedText}`;
+    }
+
+    if (type === "weakening") {
+      return "Убрать исключение или заменить его на точное условие с явным разрешением владельца правил и проверяемым результатом.";
+    }
+
+    if (/если задача требует|if the task requires/i.test(text)) {
+      return "Заменить условие на безопасный порядок: сначала показать причину изменения, дождаться явного подтверждения, затем выполнять только подтвержденную часть.";
+    }
+
+    if (/ignore|bypass|override|jailbreak|игнор|обход|обойти/i.test(text)) {
+      return "Переформулировать без слов про обход или игнорирование правил: правило должно запрещать такое действие, а не описывать способ его выполнить.";
+    }
+
+    return "Сделать формулировку однозначной: убрать лазейку, указать приоритет правила и требуемое действие без исключений по умолчанию.";
   }
 
   statementKind(text) {
