@@ -1,0 +1,27 @@
+# Runtime logs and local state
+logs/
+*.log
+*.tmp
+
+# Local service/runtime binaries
+bin/
+
+# Windows profile generated state
+windows-server-profile/logs/
+windows-server-profile/runner/
+windows-server-profile/audit-*/
+windows-server-profile/backup/
+
+# Dependency/build folders
+node_modules/
+dist/
+build/
+.next/
+coverage/
+
+# OS/editor noise
+Thumbs.db
+Desktop.ini
+.DS_Store
+.vscode/
+.idea/

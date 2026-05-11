@@ -1,0 +1,18 @@
+{
+  "name": "windows-project-watch-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for monitoring project file changes on Windows.",
+  "type": "module",
+  "bin": {
+    "windows-project-watch-mcp": "./src/server.js"
+  },
+  "scripts": {
+    "start": "node ./src/server.js",
+    "web": "node ./src/server.js --web --port 3777",
+    "smoke": "node ./scripts/smoke.js"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": ">=20"
+  }
+}

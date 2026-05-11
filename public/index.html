@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="cache-control" content="no-store" />
+    <meta http-equiv="pragma" content="no-cache" />
+    <title>Auditor Dashboard</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f6f8;
+        --panel: #ffffff;
+        --text: #17202a;
+        --muted: #667085;
+        --line: #d7dde6;
+        --accent: #087f8c;
+        --good: #2f8f46;
+        --warn: #a15c00;
+        --bad: #b42318;
+        --soft: #edf7f8;
+        --shadow: 0 2px 8px rgba(18, 32, 43, 0.05);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, Segoe UI, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+
+      .page {
+        min-height: 100vh;
+        padding: 8px;
+        display: grid;
+        align-content: start;
+        gap: 8px;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 26px;
+        line-height: 1.2;
+      }
+
+      .subtitle {
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 4px;
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+
+      .pill {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--text);
+        border-radius: 999px;
+        padding: 8px 11px;
+        font-size: 12px;
+        font-weight: 750;
+        box-shadow: var(--shadow);
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(160px, 1fr));
+        gap: 8px;
+      }
+
+      .card,
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+      }
+
+      .card {
+        min-height: 78px;
+        padding: 8px 10px;
+        display: grid;
+        grid-template-columns: 64px 72px minmax(0, 1fr);
+        grid-template-rows: auto auto;
+        align-items: center;
+        column-gap: 10px;
+        row-gap: 5px;
+        min-width: 0;
+      }
+
+      .label {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .value {
+        font-size: 24px;
+        font-weight: 850;
+        line-height: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-align: right;
+      }
+
+      .detail {
+        color: var(--muted);
+        font-size: 11px;
+        min-height: 14px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .bar {
+        height: 7px;
+        min-width: 0;
+        width: 100%;
+        border-radius: 999px;
+        background: #e8edf3;
+        overflow: hidden;
+      }
+
+      .card > .detail {
+        grid-column: 1 / -1;
+      }
+
+      .bar-fill {
+        height: 100%;
+        width: 0;
+        background: var(--accent);
+        border-radius: inherit;
+        transition: width 180ms ease;
+      }
+
+      .bar-fill.warn {
+        background: var(--warn);
+      }
+
+      .bar-fill.bad {
+        background: var(--bad);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+      }
+
+      .panel {
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      .panel header {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .panel h2 {
+        font-size: 13px;
+      }
+
+      .content {
+        padding: 8px 10px;
+      }
+
+      .disk-list,
+      .service-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 6px;
+      }
+
+      .disk,
+      .service {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 6px 8px;
+        background: #fbfcfe;
+        display: grid;
+        gap: 5px;
+      }
+
+      .disk-top,
+      .service {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .state {
+        border-radius: 999px;
+        padding: 4px 8px;
+        font-size: 11px;
+        font-weight: 850;
+      }
+
+      .running {
+        color: var(--good);
+        background: #e9f7ee;
+      }
+
+      .stopped {
+        color: var(--bad);
+        background: #fdeceb;
+      }
+
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font: 13px/1.45 Consolas, "Cascadia Mono", monospace;
+        color: #293442;
+      }
+
+      @media (max-width: 1100px) {
+        .cards {
+          grid-template-columns: repeat(4, minmax(120px, 1fr));
+        }
+      }
+
+      @media (max-width: 760px) {
+        .cards {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      @media (max-width: 520px) {
+        .page {
+          padding: 6px;
+        }
+
+        .cards {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="cards">
+        <article class="card">
+          <div class="label">CPU</div>
+          <div class="value" id="cpuValue">-</div>
+          <div class="bar"><div class="bar-fill" id="cpuBar"></div></div>
+          <div class="detail" id="cpuDetail">current load</div>
+        </article>
+        <article class="card">
+          <div class="label">Memory</div>
+          <div class="value" id="memoryValue">-</div>
+          <div class="bar"><div class="bar-fill" id="memoryBar"></div></div>
+          <div class="detail" id="memoryDetail">used / total</div>
+        </article>
+        <article class="card">
+          <div class="label">GPU</div>
+          <div class="value" id="gpuValue">-</div>
+          <div class="bar"><div class="bar-fill" id="gpuBar"></div></div>
+          <div class="detail" id="gpuDetail">current load</div>
+        </article>
+        <article class="card">
+          <div class="label">Disk C:</div>
+          <div class="value" id="diskValue">-</div>
+          <div class="bar"><div class="bar-fill" id="diskBar"></div></div>
+          <div class="detail" id="diskDetail">used / total</div>
+        </article>
+      </section>
+
+      <section class="grid">
+        <article class="panel">
+          <header><h2>Disks</h2></header>
+          <div class="content disk-list" id="diskList"></div>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+
+      function pctClass(value) {
+        if (value >= 90) return "bad";
+        if (value >= 75) return "warn";
+        return "";
+      }
+
+      function setBar(id, percent) {
+        const bar = $(id);
+        bar.style.width = `${Math.max(0, Math.min(100, percent || 0))}%`;
+        bar.className = `bar-fill ${pctClass(percent)}`;
+      }
+
+      async function request(url, timeoutMs = 10000) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
+          const body = await response.json();
+          if (!response.ok) throw new Error(body.error || response.statusText);
+          return body;
+        } finally {
+          clearTimeout(timeout);
+        }
+      }
+
+      function renderDisks(disks) {
+        const list = $("diskList");
+        list.innerHTML = "";
+        for (const disk of disks) {
+          const row = document.createElement("div");
+          row.className = "disk";
+          row.innerHTML = `
+            <div class="disk-top"><strong></strong><span></span></div>
+            <div class="bar"><div class="bar-fill"></div></div>
+            <div class="detail"></div>
+          `;
+          row.querySelector("strong").textContent = disk.DeviceID;
+          row.querySelector("span").textContent = `${disk.UsedPercent}%`;
+          const fill = row.querySelector(".bar-fill");
+          fill.style.width = `${disk.UsedPercent}%`;
+          fill.className = `bar-fill ${pctClass(disk.UsedPercent)}`;
+          row.querySelector(".detail").textContent = `${disk.UsedGB} GB used / ${disk.SizeGB} GB total / ${disk.FreeGB} GB free`;
+          list.append(row);
+        }
+      }
+
+      function renderCpu(cpu) {
+        $("cpuValue").textContent = `${cpu.cpuPercent}%`;
+        $("cpuDetail").textContent = `now ${new Date(cpu.sampledAt).toLocaleTimeString()}`;
+        setBar("cpuBar", cpu.cpuPercent);
+      }
+
+      function renderMemory(memory) {
+        $("memoryValue").textContent = `${memory.usedPercent}%`;
+        $("memoryDetail").textContent = `${memory.usedGB} GB used / ${memory.totalGB} GB total / ${memory.freeGB} GB free`;
+        setBar("memoryBar", memory.usedPercent);
+      }
+
+      function renderGpu(gpu) {
+        const gpuPercent = gpu.utilizationPercent;
+        $("gpuValue").textContent = gpuPercent === null || gpuPercent === undefined ? "n/a" : `${gpuPercent}%`;
+        $("gpuDetail").textContent = `now ${new Date(gpu.sampledAt).toLocaleTimeString()}`;
+        setBar("gpuBar", gpuPercent ?? 0);
+      }
+
+      function renderDiskMetrics(diskMetrics) {
+        const disks = Array.isArray(diskMetrics.disks)
+          ? diskMetrics.disks
+          : diskMetrics.disks
+            ? [diskMetrics.disks]
+            : [];
+        const cDisk = disks.find((disk) => disk.DeviceID === "C:") || disks[0];
+
+        if (cDisk) {
+          $("diskValue").textContent = `${cDisk.UsedPercent}%`;
+          $("diskDetail").textContent = `${cDisk.UsedGB} GB used / ${cDisk.SizeGB} GB total / ${cDisk.FreeGB} GB free`;
+          setBar("diskBar", cDisk.UsedPercent);
+        }
+        renderDisks(disks);
+      }
+
+      async function refreshWidget(url, render, timeoutMs) {
+        try {
+          const data = await request(url, timeoutMs);
+          render(data);
+        } catch (error) {
+          console.warn(error);
+        }
+      }
+
+      const loops = [
+        ["/api/metrics/cpu", renderCpu, 500, 1000],
+        ["/api/metrics/memory", renderMemory, 500, 3000],
+        ["/api/metrics/gpu", renderGpu, 500, 5000],
+        ["/api/metrics/disks", renderDiskMetrics, 60000, 5000],
+      ];
+
+      for (const [url, render, interval, timeoutMs] of loops) {
+        const tick = async () => {
+          const startedAt = performance.now();
+          await refreshWidget(url, render, timeoutMs);
+          const elapsed = performance.now() - startedAt;
+          setTimeout(tick, Math.max(0, interval - elapsed));
+        };
+        void tick();
+      }
+    </script>
+  </body>
+</html>
