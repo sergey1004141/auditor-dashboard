@@ -1,16 +1,16 @@
 # Windows Server Profile
 
-PowerShell profile for making this Windows 10 Pro machine behave more like a small server.
+Набор PowerShell-скриптов для настройки Windows 10 Pro ближе к небольшому серверу.
 
-The scripts are staged and reversible:
+Скрипты разложены так, чтобы изменения можно было применить поэтапно и откатить:
 
-- `00-audit.ps1` - collects current services, startup apps, scheduled tasks, network profile, and power config.
-- `10-apply-server-baseline.ps1` - applies a conservative server baseline.
-- `90-rollback.ps1` - restores service startup types from a saved backup.
+- `00-audit.ps1` - собирает текущее состояние служб, автозагрузки, задач планировщика, сетевого профиля и питания.
+- `10-apply-server-baseline.ps1` - применяет осторожный серверный профиль.
+- `90-rollback.ps1` - восстанавливает типы запуска служб из сохраненной резервной копии.
 
-Run PowerShell as Administrator for full effect.
+Для полного эффекта запускайте PowerShell от имени администратора.
 
-## Recommended first run
+## Рекомендуемый первый запуск
 
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
@@ -19,21 +19,21 @@ cd C:\projects\windows-server-profile
 .\10-apply-server-baseline.ps1 -SetPrivateNetwork -DisableHibernation -DisableConsumerStartup
 ```
 
-Most service, network profile, and HKLM policy changes require Administrator rights. You can launch the recommended elevated baseline with:
+Большинство изменений служб, сетевого профиля и HKLM-политик требуют прав администратора. Рекомендуемый baseline можно запустить с повышением прав так:
 
 ```powershell
 C:\projects\windows-server-profile\run-admin-baseline.cmd
 ```
 
-## Harder profile
+## Более жесткий профиль
 
-Use only if the machine does not need printing, Bluetooth, Xbox/Game DVR, search indexing, or consumer background sync:
+Используйте только если машине не нужны печать, Bluetooth, Xbox/Game DVR, индексация поиска и потребительская фоновая синхронизация:
 
 ```powershell
 .\10-apply-server-baseline.ps1 -SetPrivateNetwork -DisableHibernation -DisableConsumerStartup -DisablePrinting -DisableBluetooth
 ```
 
-## Rollback
+## Откат
 
 ```powershell
 .\90-rollback.ps1
@@ -41,7 +41,7 @@ Use only if the machine does not need printing, Bluetooth, Xbox/Game DVR, search
 
 ## RDP
 
-Enable Remote Desktop for the current user and allow inbound access only from `192.168.1.x`:
+Включить Remote Desktop для текущего пользователя и разрешить входящие подключения только из `192.168.1.x`:
 
 ```powershell
 C:\projects\windows-server-profile\run-admin-rdp.cmd
@@ -49,20 +49,20 @@ C:\projects\windows-server-profile\run-admin-rdp.cmd
 
 ## Admin Runner
 
-Install one elevated scheduled task:
+Установить одну задачу планировщика с повышенными правами:
 
 ```powershell
 C:\projects\windows-server-profile\run-admin-task-install.cmd
 ```
 
-After that, scripts in this folder can be launched through the task:
+После этого скрипты из этой папки можно запускать через задачу:
 
 ```powershell
 .\run-admin-task.ps1 -ScriptName 21-repair-rdp-listener.ps1 -ScriptArgs "-AllowedSubnet","192.168.1.0/24","-Port","3389"
 ```
 
-## What stays enabled
+## Что остается включенным
 
-Core networking, Wi-Fi, audio, VPN, Windows Firewall, Defender, Event Log, RPC, WMI, Task Scheduler, DHCP/DNS client, user profile services, storage, Plug and Play, and Windows Update orchestration are not disabled by default.
+По умолчанию не отключаются: базовая сеть, Wi-Fi, audio, VPN, Windows Firewall, Defender, Event Log, RPC, WMI, Task Scheduler, DHCP/DNS client, службы профиля пользователя, хранилище, Plug and Play и оркестрация Windows Update.
 
-Bluetooth is intentionally removed when `-DisableBluetooth` is used.
+Bluetooth намеренно отключается при использовании `-DisableBluetooth`.

@@ -1,91 +1,91 @@
-# Auditor Dashboard Deployment
+# Развертка Auditor Dashboard
 
-This guide deploys the Auditor Dashboard as an independent Windows service.
+Эта инструкция разворачивает Auditor Dashboard как независимую службу Windows.
 
-## Requirements
+## Требования
 
-- Windows 10/11 or Windows Server.
-- Administrator rights.
-- Local network in the `192.168.1.x` subnet.
-- PowerShell 5+.
+- Windows 10/11 или Windows Server.
+- Права администратора.
+- Локальная сеть в подсети `192.168.1.x`.
+- PowerShell 5 или новее.
 - Node.js LTS.
 - NSSM.
 
-## 1. Copy The Project
+## 1. Скопировать проект
 
-Place the project in:
+Разместите проект в:
 
 ```powershell
 C:\projects
 ```
 
-Expected entrypoint:
+Ожидаемая точка входа:
 
 ```powershell
 C:\projects\src\server.js
 ```
 
-## 2. Install Node.js LTS
+## 2. Установить Node.js LTS
 
 ```powershell
 winget install --source winget --accept-source-agreements --accept-package-agreements --id OpenJS.NodeJS.LTS --exact
 ```
 
-Verify:
+Проверка:
 
 ```powershell
 & "C:\Program Files\nodejs\node.exe" --version
 ```
 
-## 3. Install NSSM
+## 3. Установить NSSM
 
 ```powershell
 winget install --source winget --accept-source-agreements --accept-package-agreements --id NSSM.NSSM --exact
 ```
 
-The service installer copies `nssm.exe` into:
+Скрипт установки службы копирует `nssm.exe` сюда:
 
 ```powershell
 C:\projects\bin\nssm.exe
 ```
 
-This keeps the Windows service independent from the user's WinGet package cache.
+Так служба Windows не зависит от пользовательского кеша пакетов WinGet.
 
-## 4. Open The Firewall For The Local Subnet
+## 4. Открыть firewall для локальной подсети
 
-Run PowerShell as Administrator:
+Запустите PowerShell от имени администратора:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File C:\projects\windows-server-profile\22-enable-dashboard-firewall.ps1
 ```
 
-Default rule:
+Правило по умолчанию:
 
-- Port: `3777`
-- Protocol: TCP
-- Remote subnet: `192.168.1.0/24`
-- Profile: Private
+- порт: `3777`
+- протокол: TCP
+- удаленная подсеть: `192.168.1.0/24`
+- профиль: Private
 
-## 5. Install The Windows Service
+## 5. Установить службу Windows
 
-Run PowerShell as Administrator:
+Запустите PowerShell от имени администратора:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File C:\projects\windows-server-profile\23-install-dashboard-service.ps1
 ```
 
-The script creates:
+Скрипт создает:
 
-- Service name: `AuditorDashboard`
-- Display name: `Auditor Dashboard`
-- Startup type: Automatic
-- Listen address: `0.0.0.0`
-- Port: `3777`
-- Allowed HTTP clients: `127.0.0.1`, `::1`, and `192.168.1.x`
+- имя службы: `AuditorDashboard`
+- отображаемое имя: `Auditor Dashboard`
+- тип запуска: Automatic
+- адрес прослушивания: `0.0.0.0`
+- порт: `3777`
+- разрешенные HTTP-клиенты: `127.0.0.1`, `::1` и `192.168.1.x`
 
-It also disables the older scheduled task named `Auditor Dashboard` when present.
+Если существует старая задача планировщика `Auditor Dashboard`, скрипт отключает ее.
 
-## 6. Verify The Service
+## 6. Проверить службу
 
 ```powershell
 Get-Service AuditorDashboard
@@ -93,78 +93,78 @@ Get-NetTCPConnection -LocalPort 3777 -State Listen
 Invoke-RestMethod http://127.0.0.1:3777/api/metrics/cpu
 ```
 
-Expected:
+Ожидаемый результат:
 
-- Service status: `Running`
-- Listener: `0.0.0.0:3777`
-- API returns JSON.
+- служба в состоянии `Running`
+- порт слушает `0.0.0.0:3777`
+- API возвращает JSON.
 
-## 7. Open The Dashboard
+## 7. Открыть дашборд
 
-On the server:
+На самом сервере:
 
 ```text
 http://127.0.0.1:3777/
 ```
 
-From another machine in the same subnet:
+С другой машины в той же подсети:
 
 ```text
 http://SERVER_IP:3777/
 ```
 
-Example:
+Пример:
 
 ```text
 http://192.168.1.108:3777/
 ```
 
-## 8. Service Management
+## 8. Управление службой
 
-Restart:
+Перезапустить:
 
 ```powershell
 Restart-Service AuditorDashboard
 ```
 
-Stop:
+Остановить:
 
 ```powershell
 Stop-Service AuditorDashboard
 ```
 
-Start:
+Запустить:
 
 ```powershell
 Start-Service AuditorDashboard
 ```
 
-Remove:
+Удалить:
 
 ```powershell
 Stop-Service AuditorDashboard
 C:\projects\bin\nssm.exe remove AuditorDashboard confirm
 ```
 
-## 9. Logs
+## 9. Логи
 
-Service logs:
+Логи службы:
 
 ```powershell
 C:\projects\logs\auditor-dashboard-service.out.log
 C:\projects\logs\auditor-dashboard-service.err.log
 ```
 
-Admin runner logs:
+Логи admin-runner:
 
 ```powershell
 C:\projects\windows-server-profile\logs\
 ```
 
-## 10. Runtime Behavior
+## 10. Поведение во время работы
 
-- CPU: live Node-based measurement.
-- RAM: live Node-based measurement, no PowerShell.
-- GPU: direct Windows performance counter. On some machines this can take 1-3 seconds per sample.
-- Disks: Windows CIM logical disk data.
-- No npm dependencies are required.
+- CPU: живое измерение средствами Node.js.
+- RAM: живое измерение средствами Node.js, без PowerShell.
+- GPU: прямой счетчик производительности Windows. На некоторых машинах один замер занимает 1-3 секунды.
+- Диски: данные логических дисков Windows CIM.
+- npm-зависимости не требуются.

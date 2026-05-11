@@ -1,46 +1,46 @@
 # Auditor Dashboard / Windows Project Watch MCP
 
-Small Windows MCP/HTTP server for monitoring project changes and displaying a compact system dashboard.
+Небольшой MCP/HTTP-сервер для Windows. Он умеет отслеживать изменения в проекте и показывать компактный дашборд состояния системы.
 
-The dashboard shows live CPU, RAM, GPU, and disk usage. It can run independently from Codex as a Windows service.
+Дашборд показывает текущую нагрузку CPU, оперативной памяти, GPU и состояние дисков. Сервер может работать независимо от Codex как обычная служба Windows.
 
-## Tools
+## Инструменты MCP
 
-- `configure_project` - set the folder to monitor.
-- `project_status` - return watcher state, snapshot changes, recent events, and optional git summary.
-- `list_recent_changes` - show recent file-system events.
-- `read_changed_file` - read a small changed text file from the project.
-- `reset_baseline` - accept the current file state as the new baseline.
+- `configure_project` - задать папку проекта для мониторинга.
+- `project_status` - вернуть состояние наблюдателя, изменения снимка, последние события и опционально сводку Git.
+- `list_recent_changes` - показать последние изменения файловой системы.
+- `read_changed_file` - прочитать небольшой измененный текстовый файл из проекта.
+- `reset_baseline` - принять текущее состояние файлов как новую базовую линию.
 
-## Run
+## Запуск MCP-сервера
 
 ```powershell
 node "C:\projects\src\server.js"
 ```
 
-## Browser Dashboard
+## Запуск веб-дашборда
 
 ```powershell
 node "C:\projects\src\server.js" --web --port 3777
 ```
 
-For access from the local `192.168.1.x` subnet only:
+Для доступа только из локальной подсети `192.168.1.x`:
 
 ```powershell
 node "C:\projects\src\server.js" --web --host 0.0.0.0 --port 3777 --allow-subnet 192.168.1.
 ```
 
-Then open:
+Открыть локально:
 
 ```text
 http://127.0.0.1:3777
 ```
 
-## Windows Service Deployment
+## Развертка как службы Windows
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for the full step-by-step setup.
+Полная пошаговая инструкция находится в [DEPLOYMENT.md](DEPLOYMENT.md).
 
-Short version:
+Короткий вариант:
 
 ```powershell
 winget install --source winget --accept-source-agreements --accept-package-agreements --id OpenJS.NodeJS.LTS --exact
@@ -49,7 +49,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File C:\projects\windows-server-p
 powershell -NoProfile -ExecutionPolicy Bypass -File C:\projects\windows-server-profile\23-install-dashboard-service.ps1
 ```
 
-For an MCP client, point it at Node and this server file:
+## Подключение к MCP-клиенту
+
+Для MCP-клиента укажите Node и путь к серверу:
 
 ```json
 {
@@ -65,24 +67,24 @@ For an MCP client, point it at Node and this server file:
 }
 ```
 
-You can omit `PROJECT_WATCH_PATH` and call `configure_project` from the client instead.
+`PROJECT_WATCH_PATH` можно не указывать и затем вызвать `configure_project` из клиента.
 
-## Structure
+## Структура проекта
 
-- `src/server.js` - entrypoint that starts MCP stdio mode or the browser dashboard.
-- `src/core/ProjectMonitor.js` - project state, snapshots, watcher, and file reads.
-- `src/core/FileSnapshot.js` - recursive scan and snapshot comparison.
-- `src/core/GitService.js` - optional git summary.
-- `src/core/ConfigStore.js` - saved project path.
-- `src/mcp/ToolRegistry.js` - MCP tool definitions and handlers.
-- `src/mcp/McpStdioServer.js` - MCP JSON-RPC framing over stdio.
-- `src/web/DashboardServer.js` - HTTP API for the dashboard.
-- `src/web/StaticFileServer.js` - static assets from `public/`.
-- `public/index.html` - browser UI.
+- `src/server.js` - точка входа, запускает MCP stdio-режим или веб-дашборд.
+- `src/core/ProjectMonitor.js` - состояние проекта, снимки, наблюдатель и чтение файлов.
+- `src/core/FileSnapshot.js` - рекурсивное сканирование и сравнение снимков.
+- `src/core/GitService.js` - опциональная сводка Git.
+- `src/core/ConfigStore.js` - сохраненный путь проекта.
+- `src/mcp/ToolRegistry.js` - определения и обработчики MCP-инструментов.
+- `src/mcp/McpStdioServer.js` - JSON-RPC обмен MCP через stdio.
+- `src/web/DashboardServer.js` - HTTP API для дашборда.
+- `src/web/StaticFileServer.js` - статические файлы из `public/`.
+- `public/index.html` - браузерный интерфейс.
 
-## Notes
+## Примечания
 
-- No npm packages are required; this server uses only built-in Node modules.
-- Recursive `fs.watch` works on Windows. If watching fails, `project_status` still detects changes by comparing snapshots.
-- Large/generated folders are ignored by default: `.git`, `node_modules`, `dist`, `build`, `.next`, `coverage`, and similar.
-- Git support is optional. If `git` is not in PATH, the server still monitors files.
+- npm-пакеты не требуются, сервер использует только встроенные модули Node.js.
+- Рекурсивный `fs.watch` работает на Windows. Если наблюдение недоступно, `project_status` все равно находит изменения сравнением снимков.
+- Крупные и генерируемые папки игнорируются по умолчанию: `.git`, `node_modules`, `dist`, `build`, `.next`, `coverage` и похожие.
+- Поддержка Git опциональна. Если `git` отсутствует в `PATH`, сервер все равно мониторит файлы.
