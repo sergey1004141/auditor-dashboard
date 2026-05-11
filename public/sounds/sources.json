@@ -1,72 +1,7 @@
-﻿[
-    {
-        "key":  "bellEcho",
-        "name":  "Bell echo",
-        "file":  "alert-bells-echo.mp3",
-        "source":  "https://mixkit.co/free-sound-effects/alerts/",
-        "license":  "Mixkit Sound Effects Free License"
-    },
-    {
-        "key":  "pageForward",
-        "name":  "Page forward chime",
-        "file":  "page-forward-single-chime.mp3",
-        "source":  "https://mixkit.co/free-sound-effects/chimes/",
-        "license":  "Mixkit Sound Effects Free License"
-    },
-    {
-        "key":  "relaxingBell",
-        "name":  "Relaxing bell",
-        "file":  "relaxing-bell-chime.mp3",
-        "source":  "https://mixkit.co/free-sound-effects/chimes/",
-        "license":  "Mixkit Sound Effects Free License"
-    },
-    {
-        "key":  "crystalChime",
-        "name":  "Crystal chime",
-        "file":  "crystal-chime.mp3",
-        "source":  "https://mixkit.co/free-sound-effects/chimes/",
-        "license":  "Mixkit Sound Effects Free License"
-    },
-    {
-        "key":  "correctTone",
-        "name":  "Correct tone",
-        "file":  "correct-answer-tone.mp3",
-        "source":  "https://mixkit.co/free-sound-effects/tones/",
-        "license":  "Mixkit Sound Effects Free License"
-    },
-    {
-        "key":  "elevatorTone",
-        "name":  "Elevator tone",
-        "file":  "elevator-tone.mp3",
-        "source":  "https://mixkit.co/free-sound-effects/tones/",
-        "license":  "Mixkit Sound Effects Free License"
-    },
-    {
-        "key":  "accessAllowed",
-        "name":  "Access allowed",
-        "file":  "access-allowed-tone.mp3",
-        "source":  "https://mixkit.co/free-sound-effects/tones/",
-        "license":  "Mixkit Sound Effects Free License"
-    },
-    {
-        "key":  "bellNotification",
-        "name":  "Bell notification",
-        "file":  "bell-notification.mp3",
-        "source":  "https://mixkit.co/free-sound-effects/bell/",
-        "license":  "Mixkit Sound Effects Free License"
-    },
-    {
-        "key":  "achievementBell",
-        "name":  "Achievement bell",
-        "file":  "achievement-bell.mp3",
-        "source":  "https://mixkit.co/free-sound-effects/bell/",
-        "license":  "Mixkit Sound Effects Free License"
-    },
-    {
-        "key":  "retroGame",
-        "name":  "Retro game",
-        "file":  "retro-game-notification.mp3",
-        "source":  "https://mixkit.co/free-sound-effects/video-game/",
-        "license":  "Mixkit Sound Effects Free License"
-    }
-]
+﻿{
+    "key":  "relaxingBell",
+    "name":  "Relaxing bell",
+    "file":  "relaxing-bell-chime.mp3",
+    "source":  "https://mixkit.co/free-sound-effects/chimes/",
+    "license":  "Mixkit Sound Effects Free License"
+}

@@ -172,10 +172,14 @@ export class TokenUsageService {
 
   formatLimit(limit) {
     if (!limit || typeof limit.used_percent !== "number") return null;
+    const usedPercent = Math.max(0, Math.min(100, limit.used_percent));
+    const remainingPercent = Math.max(0, 100 - usedPercent);
     const resetsAt = limit.resets_at ? new Date(limit.resets_at * 1000) : null;
     return {
-      usedPercent: limit.used_percent,
-      usedPercentFormatted: `${limit.used_percent.toFixed(3)}%`,
+      usedPercent,
+      usedPercentFormatted: `${usedPercent.toFixed(3)}%`,
+      remainingPercent,
+      remainingPercentFormatted: `${remainingPercent.toFixed(3)}%`,
       windowMinutes: limit.window_minutes ?? null,
       label: this.formatWindowLabel(limit.window_minutes),
       resetsAt: resetsAt ? resetsAt.toISOString() : null,
