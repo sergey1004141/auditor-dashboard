@@ -540,6 +540,7 @@
       let lastRulesAlertKey = "";
       let lastRulesAlertAt = 0;
       let rulesAlertTimer = null;
+      let soundUnlocked = false;
       const RULE_ALERT_INTERVAL_MS = 3000;
       const ALERT_SOUNDS = {
         relaxingBell: "/sounds/relaxing-bell-chime.mp3",
@@ -557,16 +558,36 @@
         lastRulesAlertAt = now;
 
         try {
-          const source = ALERT_SOUNDS.relaxingBell;
-          if (currentAlertAudio) {
-            currentAlertAudio.pause();
-            currentAlertAudio.currentTime = 0;
+          if (!currentAlertAudio) {
+            currentAlertAudio = new Audio(ALERT_SOUNDS.relaxingBell);
+            currentAlertAudio.volume = 0.9;
+            currentAlertAudio.preload = "auto";
           }
-          currentAlertAudio = new Audio(source);
-          currentAlertAudio.volume = 0.9;
+          currentAlertAudio.pause();
+          currentAlertAudio.currentTime = 0;
           await currentAlertAudio.play();
+          soundUnlocked = true;
         } catch (error) {
           console.warn("Sound alert is blocked until page interaction.", error);
+        }
+      }
+
+      async function unlockRulesSound() {
+        if (soundUnlocked) return;
+        try {
+          if (!currentAlertAudio) {
+            currentAlertAudio = new Audio(ALERT_SOUNDS.relaxingBell);
+            currentAlertAudio.volume = 0.9;
+            currentAlertAudio.preload = "auto";
+          }
+          currentAlertAudio.muted = true;
+          await currentAlertAudio.play();
+          currentAlertAudio.pause();
+          currentAlertAudio.currentTime = 0;
+          currentAlertAudio.muted = false;
+          soundUnlocked = true;
+        } catch {
+          if (currentAlertAudio) currentAlertAudio.muted = false;
         }
       }
 
@@ -785,6 +806,8 @@
         await refreshWidget("/api/rules", renderRules, 10000);
       });
 
+      window.addEventListener("pointerdown", () => void unlockRulesSound(), { passive: true });
+      window.addEventListener("keydown", () => void unlockRulesSound());
     </script>
   </body>
 </html>
