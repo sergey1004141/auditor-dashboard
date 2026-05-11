@@ -248,7 +248,8 @@
         margin-right: 5px;
       }
 
-      .rules-chip button {
+      .rules-chip button,
+      .rules-chip select {
         border: 0;
         border-radius: 5px;
         padding: 2px 7px;
@@ -257,6 +258,10 @@
         font: inherit;
         font-weight: 800;
         cursor: pointer;
+      }
+
+      .rules-chip select {
+        max-width: 145px;
       }
 
       .rules-list {
@@ -424,7 +429,17 @@
               <div class="rules-chip"><strong>Файлы</strong><span id="rulesFiles">-</span></div>
               <div class="rules-chip"><strong>Изменения</strong><span id="rulesChanges">-</span></div>
               <div class="rules-chip"><strong>Роль</strong><span id="rulesRoleView">Developer</span></div>
-              <div class="rules-chip"><strong>Звук</strong><button type="button" id="rulesSound">Вкл</button></div>
+              <div class="rules-chip">
+                <strong>Звук</strong>
+                <select id="rulesSoundPreset">
+                  <option value="soft">Мягкий</option>
+                  <option value="double">Двойной</option>
+                  <option value="alarm">Тревога</option>
+                  <option value="short">Короткий</option>
+                  <option value="mute">Без звука</option>
+                </select>
+                <button type="button" id="rulesSound">Тест</button>
+              </div>
             </div>
             <div class="detail" id="rulesNote"></div>
             <div class="rules-list" id="rulesFindings"></div>
@@ -435,12 +450,46 @@
 
     <script>
       const $ = (id) => document.getElementById(id);
-      let soundEnabled = localStorage.getItem("auditorRulesSound") !== "off";
+      let soundPreset = localStorage.getItem("auditorRulesSoundPreset") || "soft";
       let audioContext = null;
       let lastRulesAlertKey = "";
       let lastRulesAlertAt = 0;
       let rulesAlertTimer = null;
       const RULE_ALERT_INTERVAL_MS = 3000;
+      const SOUND_PRESETS = {
+        soft: {
+          wave: "sine",
+          volume: 0.2,
+          notes: [
+            [523, 0, 0.14],
+            [659, 0.16, 0.18],
+          ],
+        },
+        double: {
+          wave: "triangle",
+          volume: 0.28,
+          notes: [
+            [740, 0, 0.09],
+            [740, 0.18, 0.09],
+          ],
+        },
+        alarm: {
+          wave: "square",
+          volume: 0.26,
+          notes: [
+            [880, 0, 0.16],
+            [660, 0.17, 0.16],
+            [880, 0.34, 0.16],
+          ],
+        },
+        short: {
+          wave: "sine",
+          volume: 0.32,
+          notes: [
+            [980, 0, 0.18],
+          ],
+        },
+      };
 
       function pctClass(value) {
         if (value >= 90) return "bad";
@@ -449,7 +498,7 @@
       }
 
       function updateSoundButton() {
-        $("rulesSound").textContent = "Тест";
+        $("rulesSoundPreset").value = soundPreset;
       }
 
       async function ensureAudio() {
@@ -461,7 +510,7 @@
       }
 
       async function signalRulesAlert(force = false) {
-        if (!soundEnabled) return;
+        if (soundPreset === "mute") return;
         const now = Date.now();
         if (!force && now - lastRulesAlertAt < RULE_ALERT_INTERVAL_MS - 100) return;
         lastRulesAlertAt = now;
@@ -469,18 +518,22 @@
         try {
           const context = await ensureAudio();
           if (!context) return;
-          const oscillator = context.createOscillator();
-          const gain = context.createGain();
-          oscillator.type = "sine";
-          oscillator.frequency.setValueAtTime(880, context.currentTime);
-          oscillator.frequency.setValueAtTime(660, context.currentTime + 0.12);
-          gain.gain.setValueAtTime(0.0001, context.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.32, context.currentTime + 0.02);
-          gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.32);
-          oscillator.connect(gain);
-          gain.connect(context.destination);
-          oscillator.start();
-          oscillator.stop(context.currentTime + 0.35);
+          const preset = SOUND_PRESETS[soundPreset] || SOUND_PRESETS.soft;
+          for (const [frequency, offset, duration] of preset.notes) {
+            const oscillator = context.createOscillator();
+            const gain = context.createGain();
+            const start = context.currentTime + offset;
+            const end = start + duration;
+            oscillator.type = preset.wave;
+            oscillator.frequency.setValueAtTime(frequency, start);
+            gain.gain.setValueAtTime(0.0001, start);
+            gain.gain.exponentialRampToValueAtTime(preset.volume, start + 0.015);
+            gain.gain.exponentialRampToValueAtTime(0.0001, end);
+            oscillator.connect(gain);
+            gain.connect(context.destination);
+            oscillator.start(start);
+            oscillator.stop(end + 0.02);
+          }
         } catch (error) {
           console.warn("Sound alert is blocked until page interaction.", error);
         }
@@ -698,9 +751,17 @@
       });
 
       $("rulesSound").addEventListener("click", () => {
-        soundEnabled = true;
-        localStorage.setItem("auditorRulesSound", "on");
         updateSoundButton();
+        void signalRulesAlert(true);
+      });
+
+      $("rulesSoundPreset").addEventListener("change", (event) => {
+        soundPreset = event.target.value;
+        localStorage.setItem("auditorRulesSoundPreset", soundPreset);
+        if (soundPreset === "mute") {
+          stopRulesAlert();
+          return;
+        }
         void signalRulesAlert(true);
       });
 
