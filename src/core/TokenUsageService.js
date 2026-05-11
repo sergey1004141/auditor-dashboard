@@ -20,19 +20,30 @@ export class TokenUsageService {
     const files = await this.sessionFiles();
     const todayStart = this.startOfToday();
     let latest = null;
+    let currentThreadLatest = null;
     const daily = this.emptyUsage();
     let dailySessions = 0;
+    let currentThreadId = process.env.CODEX_THREAD_ID ?? null;
 
     for (const file of files) {
       const info = await stat(file);
       if (info.size > MAX_LOG_BYTES) continue;
       if (info.mtime < todayStart) continue;
 
-      const parsed = await this.parseSessionFile(file, todayStart);
+      const parsed = await this.parseSessionFile(file, todayStart, currentThreadId);
       if (!parsed.latest) continue;
 
       if (!latest || parsed.latest.timestamp > latest.timestamp) {
         latest = parsed.latest;
+      }
+
+      if (parsed.threadLatest && (!currentThreadLatest || parsed.threadLatest.timestamp > currentThreadLatest.timestamp)) {
+        currentThreadLatest = parsed.threadLatest;
+      }
+
+      if (!currentThreadId && parsed.latest && (!currentThreadLatest || parsed.latest.timestamp > currentThreadLatest.timestamp)) {
+        currentThreadId = parsed.threadId;
+        currentThreadLatest = parsed.latest;
       }
 
       if (parsed.todayUsage) {
@@ -74,6 +85,7 @@ export class TokenUsageService {
         outputTokens: daily.output_tokens,
         reasoningOutputTokens: daily.reasoning_output_tokens,
       },
+      currentThread: this.formatThreadUsage(currentThreadLatest, currentThreadId),
     };
   }
 
@@ -103,18 +115,28 @@ export class TokenUsageService {
     }
   }
 
-  async parseSessionFile(file, todayStart) {
+  async parseSessionFile(file, todayStart, currentThreadId = null) {
     const raw = await readFile(file, "utf8");
     let latest = null;
     let todayUsage = null;
+    let threadId = null;
+    let threadLatest = null;
 
     for (const line of raw.split(/\r?\n/)) {
-      if (!line.includes('"token_count"')) continue;
-
       let event;
       try {
         event = JSON.parse(line);
       } catch {
+        continue;
+      }
+
+      if (event.type === "session_meta" && event.payload?.id) {
+        threadId = event.payload.id;
+        continue;
+      }
+
+      if (event.payload?.type === "session_meta" && event.payload?.id) {
+        threadId = event.payload.id;
         continue;
       }
 
@@ -125,20 +147,27 @@ export class TokenUsageService {
       if (payload?.type !== "token_count") continue;
 
       const usage = payload.info?.total_token_usage;
+      const lastUsage = payload.info?.last_token_usage;
       if (usage) todayUsage = this.normalizeUsage(usage);
 
       const candidate = {
         timestamp,
         usage: this.normalizeUsage(usage),
+        lastUsage: this.normalizeUsage(lastUsage),
         rateLimits: payload.rate_limits ?? null,
+        modelContextWindow: Number(payload.info?.model_context_window ?? 0),
       };
 
       if (!latest || candidate.timestamp > latest.timestamp) {
         latest = candidate;
       }
+
+      if (currentThreadId && threadId === currentThreadId) {
+        threadLatest = candidate;
+      }
     }
 
-    return { latest, todayUsage };
+    return { latest, todayUsage, threadLatest, threadId };
   }
 
   formatLimit(limit) {
@@ -159,6 +188,40 @@ export class TokenUsageService {
       reasoning_output_tokens: Number(usage.reasoning_output_tokens ?? 0),
       total_tokens: Number(usage.total_tokens ?? 0),
     };
+  }
+
+  formatThreadUsage(latest, threadId) {
+    if (!latest) {
+      return {
+        available: false,
+        threadId,
+        message: "Текущая беседа не найдена в локальных token_count логах.",
+      };
+    }
+
+    const totalTokens = latest.usage.total_tokens;
+
+    return {
+      available: true,
+      threadId,
+      sampledAt: latest.timestamp.toISOString(),
+      totalTokens,
+      totalTokensFormatted: this.formatCompactTokens(totalTokens),
+      inputTokens: latest.usage.input_tokens,
+      cachedInputTokens: latest.usage.cached_input_tokens,
+      outputTokens: latest.usage.output_tokens,
+      reasoningOutputTokens: latest.usage.reasoning_output_tokens,
+      lastTotalTokens: latest.lastUsage.total_tokens,
+      lastTotalTokensFormatted: this.formatCompactTokens(latest.lastUsage.total_tokens),
+      modelContextWindow: latest.modelContextWindow || null,
+    };
+  }
+
+  formatCompactTokens(value) {
+    const tokens = Number(value ?? 0);
+    if (tokens >= 1000000) return `${(tokens / 1000000).toFixed(1)}M`;
+    if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}K`;
+    return String(tokens);
   }
 
   emptyUsage() {

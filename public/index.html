@@ -404,10 +404,10 @@
           <div class="detail" id="diskDetail">used / total</div>
         </article>
         <article class="card">
-          <div class="label">Codex</div>
+          <div class="label">Chat</div>
           <div class="value" id="tokenValue">-</div>
           <div class="bar"><div class="bar-fill" id="tokenBar"></div></div>
-          <div class="detail" id="tokenDetail">token limit</div>
+          <div class="detail" id="tokenDetail">tokens in this dialog</div>
         </article>
       </section>
 
@@ -623,10 +623,17 @@
           return;
         }
 
-        const percent = Number(tokens.percent ?? 0);
-        $("tokenValue").textContent = tokens.percentFormatted || `${percent.toFixed(3)}%`;
-        $("tokenDetail").textContent = `${Number(tokens.today?.totalTokens ?? 0).toLocaleString("ru-RU")} токенов сегодня`;
-        setBar("tokenBar", percent);
+        const thread = tokens.currentThread;
+        if (!thread?.available) {
+          $("tokenValue").textContent = "n/a";
+          $("tokenDetail").textContent = thread?.message || "current dialog not found";
+          setBar("tokenBar", 0);
+          return;
+        }
+
+        $("tokenValue").textContent = thread.totalTokensFormatted || Number(thread.totalTokens ?? 0).toLocaleString("ru-RU");
+        $("tokenDetail").textContent = `${Number(thread.totalTokens ?? 0).toLocaleString("ru-RU")} всего / ${thread.lastTotalTokensFormatted || "n/a"} последний ход`;
+        setBar("tokenBar", 100);
       }
 
       function renderRules(status) {
