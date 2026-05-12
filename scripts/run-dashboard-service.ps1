@@ -5,6 +5,22 @@ $nodePath = "C:\Program Files\nodejs\node.exe"
 $serverPath = Join-Path $projectRoot "src\server.js"
 $secretPath = Join-Path $projectRoot "secrets\rules-share.json"
 
+function Get-AllowedSubnetPrefix {
+  if ($env:PROJECT_WATCH_ALLOWED_SUBNET) {
+    return $env:PROJECT_WATCH_ALLOWED_SUBNET
+  }
+
+  $address = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+    Where-Object { $_.IPAddress -like "192.168.*" -and $_.AddressState -eq "Preferred" } |
+    Select-Object -First 1 -ExpandProperty IPAddress
+
+  if ($address -match '^(\d+\.\d+\.\d+)\.\d+$') {
+    return "$($Matches[1])."
+  }
+
+  return "192.168.1."
+}
+
 if (-not (Test-Path $nodePath)) {
   throw "System Node.js was not found at $nodePath."
 }
@@ -37,4 +53,5 @@ if (Test-Path $secretPath) {
   }
 }
 
-& $nodePath $serverPath --web --host 0.0.0.0 --port 3777 --allow-subnet 192.168.1.
+$allowedSubnet = Get-AllowedSubnetPrefix
+& $nodePath $serverPath --web --host 0.0.0.0 --port 3777 --allow-subnet $allowedSubnet
