@@ -6,7 +6,7 @@
 
 - Windows 10/11 или Windows Server.
 - Права администратора.
-- Локальная сеть в подсети `192.168.1.x`.
+- Локальная сеть в подсети `192.168.88.x`.
 - PowerShell 5 или новее.
 - Node.js LTS.
 - NSSM.
@@ -16,13 +16,13 @@
 Разместите проект в:
 
 ```powershell
-C:\projects
+C:\projects\MCP_analitic
 ```
 
 Ожидаемая точка входа:
 
 ```powershell
-C:\projects\src\server.js
+C:\projects\MCP_analitic\src\server.js
 ```
 
 ## 2. Установить Node.js LTS
@@ -46,7 +46,7 @@ winget install --source winget --accept-source-agreements --accept-package-agree
 Скрипт установки службы копирует `nssm.exe` сюда:
 
 ```powershell
-C:\projects\bin\nssm.exe
+C:\projects\MCP_analitic\bin\nssm.exe
 ```
 
 Так служба Windows не зависит от пользовательского кеша пакетов WinGet.
@@ -63,7 +63,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File C:\projects\windows-server-p
 
 - порт: `3777`
 - протокол: TCP
-- удаленная подсеть: `192.168.1.0/24`
+- удаленная подсеть: `192.168.88.0/24`
 - профиль: Private
 
 ## 5. Установить службу Windows
@@ -81,7 +81,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File C:\projects\windows-server-p
 - тип запуска: Automatic
 - адрес прослушивания: `0.0.0.0`
 - порт: `3777`
-- разрешенные HTTP-клиенты: `127.0.0.1`, `::1` и `192.168.1.x`
+- разрешенные HTTP-клиенты: `127.0.0.1`, `::1` и `192.168.88.x`
 
 Если существует старая задача планировщика `Auditor Dashboard`, скрипт отключает ее.
 
@@ -116,7 +116,7 @@ http://SERVER_IP:3777/
 Пример:
 
 ```text
-http://192.168.1.108:3777/
+http://192.168.88.108:3777/
 ```
 
 ## 8. Настроить мониторинг правил ИИ
@@ -149,7 +149,7 @@ http://192.168.1.108:3777/
 Если нужно подключать сетевую шару отдельной учетной записью, создайте локальный файл:
 
 ```powershell
-C:\projects\secrets\rules-share.json
+C:\projects\MCP_analitic\secrets\rules-share.json
 ```
 
 Пример структуры:
@@ -194,7 +194,7 @@ Start-Service AuditorDashboard
 
 ```powershell
 Stop-Service AuditorDashboard
-C:\projects\bin\nssm.exe remove AuditorDashboard confirm
+C:\projects\MCP_analitic\bin\nssm.exe remove AuditorDashboard confirm
 ```
 
 ## 10. Логи
@@ -202,8 +202,8 @@ C:\projects\bin\nssm.exe remove AuditorDashboard confirm
 Логи службы:
 
 ```powershell
-C:\projects\logs\auditor-dashboard-service.out.log
-C:\projects\logs\auditor-dashboard-service.err.log
+C:\projects\MCP_analitic\logs\auditor-dashboard-service.out.log
+C:\projects\MCP_analitic\logs\auditor-dashboard-service.err.log
 ```
 
 Логи admin-runner:

@@ -1,6 +1,6 @@
 param(
   [int] $Port = 3777,
-  [string] $AllowedSubnet = "192.168.1.0/24",
+  [string] $AllowedSubnet = "192.168.88.0/24",
   [string] $RuleName = "Project Watch Dashboard 3777"
 )
 

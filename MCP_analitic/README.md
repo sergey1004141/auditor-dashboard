@@ -19,19 +19,19 @@
 ## Запуск MCP-сервера
 
 ```powershell
-node "C:\projects\src\server.js"
+node "C:\projects\MCP_analitic\src\server.js"
 ```
 
 ## Запуск веб-дашборда
 
 ```powershell
-node "C:\projects\src\server.js" --web --port 3777
+node "C:\projects\MCP_analitic\src\server.js" --web --port 3777
 ```
 
-Для доступа только из локальной подсети `192.168.1.x`:
+Для доступа только из локальной подсети `192.168.88.x`:
 
 ```powershell
-node "C:\projects\src\server.js" --web --host 0.0.0.0 --port 3777 --allow-subnet 192.168.1.
+node "C:\projects\MCP_analitic\src\server.js" --web --host 0.0.0.0 --port 3777 --allow-subnet 192.168.88.
 ```
 
 Открыть локально:
@@ -78,7 +78,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File C:\projects\windows-server-p
   "mcpServers": {
     "project-watch": {
       "command": "node",
-      "args": ["C:\\projects\\src\\server.js"],
+      "args": ["C:\\projects\\MCP_analitic\\src\\server.js"],
       "env": {
         "PROJECT_WATCH_PATH": "C:\\path\\to\\your\\project"
       }

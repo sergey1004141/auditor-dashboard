@@ -41,7 +41,7 @@ C:\projects\windows-server-profile\run-admin-baseline.cmd
 
 ## RDP
 
-Включить Remote Desktop для текущего пользователя и разрешить входящие подключения только из `192.168.1.x`:
+Включить Remote Desktop для текущего пользователя и разрешить входящие подключения только из `192.168.88.x`:
 
 ```powershell
 C:\projects\windows-server-profile\run-admin-rdp.cmd
@@ -58,7 +58,7 @@ C:\projects\windows-server-profile\run-admin-task-install.cmd
 После этого скрипты из этой папки можно запускать через задачу:
 
 ```powershell
-.\run-admin-task.ps1 -ScriptName 21-repair-rdp-listener.ps1 -ScriptArgs "-AllowedSubnet","192.168.1.0/24","-Port","3389"
+.\run-admin-task.ps1 -ScriptName 21-repair-rdp-listener.ps1 -ScriptArgs "-AllowedSubnet","192.168.88.0/24","-Port","3389"
 ```
 
 ## Что остается включенным

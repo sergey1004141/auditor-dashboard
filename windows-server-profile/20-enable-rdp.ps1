@@ -1,6 +1,6 @@
 param(
   [string] $UserName = "DESKTOP-GT8NM2N\user",
-  [string] $AllowedSubnet = "192.168.1.0/24",
+  [string] $AllowedSubnet = "192.168.88.0/24",
   [int] $Port = 3389
 )
 
@@ -77,12 +77,12 @@ try {
 }
 
 try {
-  $Existing = Get-NetFirewallRule -DisplayName "RDP 3389 192.168.1.x" -ErrorAction SilentlyContinue
+  $Existing = Get-NetFirewallRule -DisplayName "RDP 3389 192.168.88.x" -ErrorAction SilentlyContinue
   if (-not $Existing) {
-    New-NetFirewallRule -DisplayName "RDP 3389 192.168.1.x" -Direction Inbound -Action Allow -Protocol TCP -LocalPort $Port -RemoteAddress $AllowedSubnet -Profile Private -ErrorAction Stop | Out-Null
+    New-NetFirewallRule -DisplayName "RDP 3389 192.168.88.x" -Direction Inbound -Action Allow -Protocol TCP -LocalPort $Port -RemoteAddress $AllowedSubnet -Profile Private -ErrorAction Stop | Out-Null
     Log "Fallback firewall rule created for TCP $Port from $AllowedSubnet."
   } else {
-    Set-NetFirewallRule -DisplayName "RDP 3389 192.168.1.x" -Enabled True -Profile Private -Action Allow -ErrorAction Stop
+    Set-NetFirewallRule -DisplayName "RDP 3389 192.168.88.x" -Enabled True -Profile Private -Action Allow -ErrorAction Stop
     Set-NetFirewallPortFilter -AssociatedNetFirewallRule $Existing -LocalPort $Port -Protocol TCP -ErrorAction SilentlyContinue
     Set-NetFirewallAddressFilter -AssociatedNetFirewallRule $Existing -RemoteAddress $AllowedSubnet -ErrorAction SilentlyContinue
     Log "Fallback firewall rule updated."

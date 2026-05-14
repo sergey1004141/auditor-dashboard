@@ -491,6 +491,30 @@
         margin-bottom: 5px;
       }
 
+      .finding-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .dismiss-rule-message {
+        border: 0;
+        border-radius: 5px;
+        background: #e7edf3;
+        color: var(--muted);
+        cursor: pointer;
+        font: inherit;
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 1;
+        padding: 5px 7px;
+      }
+
+      .dismiss-rule-message:hover {
+        color: var(--text);
+      }
+
       .task-table {
         width: 100%;
         min-width: 720px;
@@ -711,7 +735,7 @@
               <button type="submit">Сохранить</button>
             </form>
             <div class="rules-review-path" id="rulesReviewPath" hidden>
-              <strong>Каталог diff</strong>
+              <strong>Каталог уведомлений</strong>
               <code id="rulesReviewDir"></code>
               <a id="rulesReviewOpen" href="#" target="_blank" rel="noopener">Открыть</a>
             </div>
@@ -753,6 +777,7 @@
       const ALERT_SOUNDS = {
         relaxingBell: "/sounds/relaxing-bell-chime.mp3",
       };
+      const RULE_MESSAGES_KEY = "auditor.ruleMessages.v1";
 
       function pctClass(value) {
         if (value >= 90) return "bad";
@@ -970,11 +995,47 @@
         renderLimit("limitSecondary", rateLimits?.secondary, "Еженедельно");
       }
 
+      function renderRuleNotifications(notifications) {
+        const list = $("rulesFindings");
+        list.innerHTML = "";
+
+        if (!notifications.length) {
+          const empty = document.createElement("div");
+          empty.className = "detail";
+          empty.textContent = "Замечаний нет.";
+          list.append(empty);
+          return;
+        }
+
+        for (const notification of notifications) {
+          const item = document.createElement("div");
+          item.className = `finding ${notification.severity === "critical" ? "critical" : ""}`;
+          item.innerHTML = `
+            <div class="finding-top">
+              <strong></strong>
+              <button class="dismiss-rule-message" type="button">Выполнено</button>
+            </div>
+            <div class="detail"></div>
+            <div class="quote"></div>
+            <div class="suggestion"></div>
+          `;
+          item.querySelector("strong").textContent = notification.title || "Замечание";
+          item.querySelector(".detail").textContent = notification.detail || "";
+          item.querySelector(".quote").textContent = notification.quote || "";
+          item.querySelector(".suggestion").textContent = notification.suggestion || "";
+          item.querySelector(".suggestion").hidden = !notification.suggestion;
+          item.querySelector("button").addEventListener("click", async () => {
+            await completeRuleNotification(notification.id);
+          });
+          list.append(item);
+        }
+      }
+
       function renderRules(status) {
         $("rulesStatus").textContent = status.status || "-";
         if (status.rulesFile || status.rulesPath) $("rulesPath").value = status.rulesFile || status.rulesPath;
         if (status.role) $("rulesRole").value = status.role;
-        renderRulesReviewPath(status.reviewPackage);
+        renderRulesReviewPath(status);
 
         const changes = status.changes || { added: [], modified: [], deleted: [] };
         const changeCount = changes.added.length + changes.modified.length + changes.deleted.length;
@@ -987,6 +1048,14 @@
         diffList.innerHTML = "";
         historyList.innerHTML = "";
         diffList.dataset.reviewId = "";
+        const notifications = Array.isArray(status.ruleNotifications) ? status.ruleNotifications : [];
+        renderRuleNotifications(notifications);
+        if (notifications.some((notification) => notification.severity === "critical")) {
+          signalRulesChanges(notifications);
+        } else {
+          stopRulesAlert();
+        }
+        return;
         renderRulesDiff(status.reviewPackage);
         renderRulesHistory(status.reviewHistory);
         const findings = Array.isArray(status.findings) ? status.findings.slice(0, 10) : [];
@@ -1079,13 +1148,22 @@
         }
       }
 
-      function renderRulesReviewPath(reviewPackage) {
+      function renderRulesReviewPath(status) {
         const root = $("rulesReviewPath");
-        const dir = reviewPackage?.reviewDir;
+        const dir = status?.ruleNotificationsDir || status?.reviewPackage?.reviewDir;
         root.hidden = !dir;
         if (!dir) return;
         $("rulesReviewDir").textContent = dir;
         $("rulesReviewOpen").href = `file:///${dir.replaceAll("\\", "/")}`;
+      }
+
+      async function completeRuleNotification(id) {
+        await request("/api/rules/notifications/complete", {
+          method: "POST",
+          body: JSON.stringify({ id }),
+        });
+        const status = await request("/api/rules?reviewText=false", 10000);
+        renderRules(status);
       }
 
       async function completeRulesReview() {
@@ -1115,7 +1193,7 @@
         ["/api/metrics/gpu", renderGpu, 500, 5000],
         ["/api/metrics/disks", renderDiskMetrics, 60000, 5000],
         ["/api/tokens", renderTokenUsage, 60000, 10000],
-        ["/api/rules", renderRules, 60000, 10000],
+        ["/api/rules?reviewText=false", renderRules, 60000, 10000],
         ["/api/tasks", renderTaskHistory, 60000, 10000],
       ];
 
@@ -1139,7 +1217,7 @@
           body: JSON.stringify({ rulesFile: rulesPath, role }),
           headers: { "content-type": "application/json" },
         });
-        await refreshWidget("/api/rules", renderRules, 10000);
+        await refreshWidget("/api/rules?reviewText=false", renderRules, 10000);
       });
 
       window.addEventListener("pointerdown", () => void unlockRulesSound(), { passive: true });

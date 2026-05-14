@@ -50,7 +50,7 @@ if (process.argv.includes("--web")) {
     port: readPort(),
     allowedSubnet: readOption(
       "--allow-subnet",
-      process.env.PROJECT_WATCH_ALLOWED_SUBNET ?? "192.168.1.",
+      process.env.PROJECT_WATCH_ALLOWED_SUBNET ?? "192.168.88.",
     ),
     rulesMonitor,
     systemStatusService,

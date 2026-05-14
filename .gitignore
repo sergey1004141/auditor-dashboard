@@ -1,5 +1,7 @@
 # Runtime logs and local state
 logs/
+.env
+.env.local
 *.log
 *.tmp
 

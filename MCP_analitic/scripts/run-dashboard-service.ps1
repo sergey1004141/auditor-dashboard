@@ -1,9 +1,35 @@
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
-$nodePath = "C:\Program Files\nodejs\node.exe"
-$serverPath = Join-Path $projectRoot "src\server.js"
-$secretPath = Join-Path $projectRoot "secrets\rules-share.json"
+$envPath = Join-Path $projectRoot ".env"
+
+function Import-DotEnv {
+  param([string] $Path)
+  if (-not (Test-Path -LiteralPath $Path)) {
+    return
+  }
+
+  foreach ($line in Get-Content -LiteralPath $Path) {
+    $trimmed = $line.Trim()
+    if (-not $trimmed -or $trimmed.StartsWith("#")) {
+      continue
+    }
+
+    if ($trimmed -match '^([A-Za-z_][A-Za-z0-9_]*)=(.*)$') {
+      $name = $Matches[1]
+      $value = $Matches[2].Trim().Trim('"').Trim("'")
+      [Environment]::SetEnvironmentVariable($name, $value, "Process")
+    }
+  }
+}
+
+Import-DotEnv -Path $envPath
+
+$nodePath = if ($env:AUDITOR_NODE_PATH) { $env:AUDITOR_NODE_PATH } else { "C:\Program Files\nodejs\node.exe" }
+$serverPath = if ($env:AUDITOR_SERVER_ENTRY) { $env:AUDITOR_SERVER_ENTRY } else { Join-Path $projectRoot "src\server.js" }
+$secretPath = if ($env:AUDITOR_RULES_SECRET_FILE) { $env:AUDITOR_RULES_SECRET_FILE } else { Join-Path $projectRoot "secrets\rules-share.json" }
+$hostAddress = if ($env:AUDITOR_DASHBOARD_HOST) { $env:AUDITOR_DASHBOARD_HOST } else { "0.0.0.0" }
+$port = if ($env:AUDITOR_DASHBOARD_PORT) { [int]$env:AUDITOR_DASHBOARD_PORT } else { 3777 }
 
 function Get-AllowedSubnetPrefix {
   if ($env:PROJECT_WATCH_ALLOWED_SUBNET) {
@@ -18,7 +44,7 @@ function Get-AllowedSubnetPrefix {
     return "$($Matches[1])."
   }
 
-  return "192.168.1."
+  return "192.168.88."
 }
 
 if (-not (Test-Path $nodePath)) {
@@ -58,4 +84,4 @@ if (Test-Path $secretPath) {
 }
 
 $allowedSubnet = Get-AllowedSubnetPrefix
-& $nodePath $serverPath --web --host 0.0.0.0 --port 3777 --allow-subnet $allowedSubnet
+& $nodePath $serverPath --web --host $hostAddress --port $port --allow-subnet $allowedSubnet

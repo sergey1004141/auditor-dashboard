@@ -5,6 +5,7 @@ import {
   RULES_BASELINE_FILE,
   RULES_REVIEW_DIR,
   RULES_REVIEW_HISTORY_FILE,
+  RULES_NOTIFICATION_DIR,
   RULES_REVIEW_QUEUE_FILE,
 } from "../config.js";
 import { ConfigStore } from "./ConfigStore.js";
@@ -28,6 +29,7 @@ export class RulesMonitor {
     reviewQueueFile = RULES_REVIEW_QUEUE_FILE,
     reviewDir = RULES_REVIEW_DIR,
     reviewHistoryFile = RULES_REVIEW_HISTORY_FILE,
+    notificationDir = RULES_NOTIFICATION_DIR,
     rulesDiff = new RulesDiff(),
   } = {}) {
     this.rulesPath = initialRulesPath ? path.resolve(initialRulesPath) : null;
@@ -39,6 +41,7 @@ export class RulesMonitor {
     this.reviewQueueFile = reviewQueueFile;
     this.reviewDir = reviewDir;
     this.reviewHistoryFile = reviewHistoryFile;
+    this.notificationDir = notificationDir;
     this.rulesDiff = rulesDiff;
   }
 
@@ -101,6 +104,8 @@ export class RulesMonitor {
       const reviewPackage = freshReviewPackage.available
         ? await this.saveReviewPackage(freshReviewPackage, { includeText: includeReviewText })
         : await this.pendingReview({ includeText: includeReviewText });
+      const reviewHistory = await this.listReviewHistory();
+      const ruleNotifications = await this.syncRuleNotifications({ findings, reviewHistory });
 
       if (updateBaseline) {
         await this.saveBaseline(scan);
@@ -117,11 +122,23 @@ export class RulesMonitor {
         changes,
         findings,
         reviewPackage,
-        reviewHistory: await this.listReviewHistory(),
+        reviewHistory,
+        ruleNotifications,
+        ruleNotificationsDir: this.notificationDir,
         accessNote: this.networkAccessNote(),
       };
     } catch (error) {
       const source = this.rulesFile ?? this.rulesPath;
+      const findings = [
+        {
+          severity: "critical",
+          type: "access",
+          file: source,
+          message: `Файл правил недоступен: ${error.message}`,
+          text: source,
+          suggestion: "Проверить сетевой путь, доступ учетной записи службы и доступность машины с файлом правил.",
+        },
+      ];
       return {
         configured: true,
         status: "error",
@@ -135,16 +152,9 @@ export class RulesMonitor {
           ...this.emptyReviewPackage(),
           note: "Diff недоступен, потому что файл правил не читается.",
         },
-        findings: [
-          {
-            severity: "critical",
-            type: "access",
-            file: source,
-            message: `Файл правил недоступен: ${error.message}`,
-            text: source,
-            suggestion: "Проверить сетевой путь, доступ учетной записи службы и доступность машины с файлом правил.",
-          },
-        ],
+        findings,
+        ruleNotifications: await this.syncRuleNotifications({ findings, reviewHistory: [] }),
+        ruleNotificationsDir: this.notificationDir,
         accessNote: this.networkAccessNote(),
       };
     }
@@ -498,12 +508,16 @@ export class RulesMonitor {
     if (id) {
       const reviewPackage = await this.loadReviewPackageById(id).catch(() => null);
       if (reviewPackage?.available) {
-        await this.saveReviewHistory({
+        const historyEntry = {
           ...reviewPackage,
           status: "completed",
           completedAt,
           reviewMessage: this.cleanReviewMessage(reviewMessage),
-        });
+        };
+        await this.saveReviewHistory(historyEntry);
+        if (historyEntry.reviewMessage) {
+          await this.saveRuleNotification(this.reviewNotification(historyEntry));
+        }
       }
       await rm(path.join(this.reviewDir, `${id}.diff`), { force: true });
       await rm(path.join(this.reviewDir, `${id}.json`), { force: true });
@@ -535,6 +549,132 @@ export class RulesMonitor {
     ].slice(0, 20);
     await mkdir(path.dirname(this.reviewHistoryFile), { recursive: true });
     await writeFile(this.reviewHistoryFile, JSON.stringify(next, null, 2), "utf8");
+  }
+
+  async syncRuleNotifications({ findings = [], reviewHistory = [] } = {}) {
+    const existing = await this.listRuleNotifications();
+    const existingSourceIds = new Set(existing.map((item) => item.sourceId).filter(Boolean));
+
+    for (const finding of findings) {
+      const notification = this.findingNotification(finding);
+      if (!existingSourceIds.has(notification.sourceId)) {
+        await this.saveRuleNotification(notification);
+        existingSourceIds.add(notification.sourceId);
+      }
+    }
+
+    for (const entry of reviewHistory) {
+      if (!entry.reviewMessage || entry.reviewMessage === "Разобрано без текста AI-замечаний.") continue;
+      const notification = this.reviewNotification(entry);
+      if (!existingSourceIds.has(notification.sourceId)) {
+        await this.saveRuleNotification(notification);
+        existingSourceIds.add(notification.sourceId);
+      }
+    }
+
+    return this.listRuleNotifications();
+  }
+
+  findingNotification(finding) {
+    const place = [finding.file, finding.line].filter(Boolean).join(":");
+    const sourceId = this.notificationSourceId([
+      "finding",
+      finding.severity,
+      finding.type,
+      finding.file,
+      finding.line,
+      finding.text,
+    ]);
+    return {
+      sourceId,
+      source: "rules-finding",
+      severity: finding.severity || "info",
+      title: `${finding.severity || "info"} / ${finding.type || "rule"} / ${place}`,
+      detail: finding.message || finding.text || "",
+      quote: finding.related
+        ? `${finding.text}\n→ ${finding.related.file}:${finding.related.line}: ${finding.related.text}`
+        : finding.text || "",
+      suggestion: finding.suggestion || "Предложение: уточнить формулировку и убрать возможную лазейку.",
+    };
+  }
+
+  reviewNotification(entry) {
+    const files = this.reviewFileMetadata(entry.files ?? []).map((file) => file.file).filter(Boolean).join(", ");
+    return {
+      sourceId: this.notificationSourceId(["ai-review", entry.id]),
+      source: "ai-review",
+      severity: "info",
+      title: "AI-разбор правил",
+      detail: [entry.completedAt, files].filter(Boolean).join(" / "),
+      quote: entry.reviewMessage || "Разобрано без текста AI-замечаний.",
+      suggestion: "",
+    };
+  }
+
+  async saveRuleNotification(notification) {
+    const createdAt = new Date().toISOString();
+    const id = this.notificationId(notification.sourceId, createdAt);
+    const payload = {
+      id,
+      createdAt,
+      ...notification,
+    };
+    await mkdir(this.notificationDir, { recursive: true });
+    await writeFile(path.join(this.notificationDir, `${id}.json`), JSON.stringify(payload, null, 2), "utf8");
+    return payload;
+  }
+
+  async listRuleNotifications() {
+    let entries;
+    try {
+      entries = await readdir(this.notificationDir, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+
+    const notifications = [];
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+      try {
+        const data = JSON.parse(await readFile(path.join(this.notificationDir, entry.name), "utf8"));
+        notifications.push(this.sanitizeRuleNotification(data));
+      } catch {
+        continue;
+      }
+    }
+    notifications.sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)));
+    return notifications;
+  }
+
+  async completeRuleNotification(id) {
+    if (!/^worning_\d{8}-\d{6}_[A-Za-z0-9_-]+$/.test(id)) {
+      throw new Error("Invalid notification id.");
+    }
+    await rm(path.join(this.notificationDir, `${id}.json`), { force: true });
+    return { ok: true, id, notifications: await this.listRuleNotifications() };
+  }
+
+  sanitizeRuleNotification(data) {
+    return {
+      id: String(data.id ?? ""),
+      sourceId: String(data.sourceId ?? ""),
+      source: String(data.source ?? "rules"),
+      severity: String(data.severity ?? "info"),
+      title: String(data.title ?? "Замечание"),
+      detail: String(data.detail ?? ""),
+      quote: String(data.quote ?? ""),
+      suggestion: String(data.suggestion ?? ""),
+      createdAt: String(data.createdAt ?? ""),
+    };
+  }
+
+  notificationSourceId(parts) {
+    return createHash("sha256").update(parts.filter(Boolean).join("|")).digest("hex").slice(0, 16);
+  }
+
+  notificationId(sourceId, createdAt) {
+    const stamp = createdAt.replace(/\D/g, "").slice(0, 14);
+    return `worning_${stamp.slice(0, 8)}-${stamp.slice(8, 14)}_${sourceId}`;
   }
 
   async listReviewHistory({ limit = 5 } = {}) {

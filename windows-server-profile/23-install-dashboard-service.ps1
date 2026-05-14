@@ -2,16 +2,29 @@ $ErrorActionPreference = "Stop"
 
 $serviceName = "AuditorDashboard"
 $displayName = "Auditor Dashboard"
-$projectRoot = "C:\projects"
-$serverPath = Join-Path $projectRoot "src\server.js"
+$projectRoot = if ($env:AUDITOR_PROJECT_ROOT) { $env:AUDITOR_PROJECT_ROOT } else { "C:\projects\MCP_analitic" }
+$envPath = Join-Path $projectRoot ".env"
+
+if (Test-Path -LiteralPath $envPath) {
+  foreach ($line in Get-Content -LiteralPath $envPath) {
+    $trimmed = $line.Trim()
+    if (-not $trimmed -or $trimmed.StartsWith("#")) { continue }
+    if ($trimmed -match '^([A-Za-z_][A-Za-z0-9_]*)=(.*)$') {
+      [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2].Trim().Trim('"').Trim("'"), "Process")
+    }
+  }
+}
+
+$serverPath = if ($env:AUDITOR_SERVER_ENTRY) { $env:AUDITOR_SERVER_ENTRY } else { Join-Path $projectRoot "src\server.js" }
 $serviceRunnerPath = Join-Path $projectRoot "scripts\run-dashboard-service.ps1"
-$nodePath = "C:\Program Files\nodejs\node.exe"
-$logDir = Join-Path $projectRoot "logs"
-$binDir = Join-Path $projectRoot "bin"
+$nodePath = if ($env:AUDITOR_NODE_PATH) { $env:AUDITOR_NODE_PATH } else { "C:\Program Files\nodejs\node.exe" }
+$logDir = if ($env:AUDITOR_LOG_DIR) { $env:AUDITOR_LOG_DIR } else { Join-Path $projectRoot "logs" }
+$binDir = if ($env:AUDITOR_BIN_DIR) { $env:AUDITOR_BIN_DIR } else { Join-Path $projectRoot "bin" }
 $stableNssmPath = Join-Path $binDir "nssm.exe"
 $stdoutLog = Join-Path $logDir "auditor-dashboard-service.out.log"
 $stderrLog = Join-Path $logDir "auditor-dashboard-service.err.log"
 $scheduledTaskName = "Auditor Dashboard"
+$port = if ($env:AUDITOR_DASHBOARD_PORT) { [int]$env:AUDITOR_DASHBOARD_PORT } else { 3777 }
 
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 New-Item -ItemType Directory -Path $binDir -Force | Out-Null
@@ -42,13 +55,15 @@ if (-not (Test-Path $stableNssmPath)) {
 
 $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
 if ($existingService) {
-  & $stableNssmPath stop $serviceName | Out-Null
-  Start-Sleep -Seconds 1
+  if ($existingService.Status -ne "Stopped") {
+    & $stableNssmPath stop $serviceName | Out-Null
+    Start-Sleep -Seconds 1
+  }
   & $stableNssmPath remove $serviceName confirm | Out-Null
   Start-Sleep -Seconds 1
 }
 
-$connections = Get-NetTCPConnection -LocalPort 3777 -ErrorAction SilentlyContinue
+$connections = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
 foreach ($connection in $connections) {
   if ($connection.OwningProcess -gt 0) {
     $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($connection.OwningProcess)" -ErrorAction SilentlyContinue
@@ -60,7 +75,7 @@ foreach ($connection in $connections) {
 
 & $stableNssmPath install $serviceName "powershell.exe" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" $serviceRunnerPath | Out-Null
 & $stableNssmPath set $serviceName DisplayName $displayName | Out-Null
-& $stableNssmPath set $serviceName Description "Auditor system dashboard HTTP server for the local 192.168.1.x subnet." | Out-Null
+& $stableNssmPath set $serviceName Description "Auditor system dashboard HTTP server for the local 192.168.88.x subnet." | Out-Null
 & $stableNssmPath set $serviceName AppDirectory $projectRoot | Out-Null
 & $stableNssmPath set $serviceName AppStdout $stdoutLog | Out-Null
 & $stableNssmPath set $serviceName AppStderr $stderrLog | Out-Null
@@ -81,7 +96,7 @@ Start-Service -Name $serviceName
 Start-Sleep -Seconds 2
 
 $service = Get-Service -Name $serviceName
-$listener = Get-NetTCPConnection -LocalPort 3777 -State Listen -ErrorAction SilentlyContinue |
+$listener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
   Select-Object -First 1 LocalAddress,LocalPort,State,OwningProcess
 
 [pscustomobject]@{

@@ -7,7 +7,7 @@ export class DashboardServer {
     {
       host = process.env.HOST ?? "127.0.0.1",
       port = 3777,
-      allowedSubnet = process.env.PROJECT_WATCH_ALLOWED_SUBNET ?? "192.168.1.",
+      allowedSubnet = process.env.PROJECT_WATCH_ALLOWED_SUBNET ?? "192.168.88.",
       rulesMonitor = null,
       systemStatusService = null,
       tokenUsageService = null,
@@ -126,6 +126,19 @@ export class DashboardServer {
         this.sendJson(response, 200, {
           packages: await this.requireRulesMonitor().listReviewPackages(),
         });
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/rules/notifications") {
+        this.sendJson(response, 200, {
+          notifications: await this.requireRulesMonitor().listRuleNotifications(),
+        });
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/rules/notifications/complete") {
+        const body = await this.readRequestJson(request);
+        this.sendJson(response, 200, await this.requireRulesMonitor().completeRuleNotification(body.id));
         return;
       }
 

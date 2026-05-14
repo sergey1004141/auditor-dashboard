@@ -1,6 +1,6 @@
 param(
   [string] $UserName = "user",
-  [string] $PasswordFile = "C:\projects\secrets\rdp-password.txt"
+  [string] $PasswordFile = "C:\projects\MCP_analitic\secrets\rdp-password.txt"
 )
 
 $ErrorActionPreference = "Stop"
