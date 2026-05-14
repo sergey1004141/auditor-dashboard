@@ -981,10 +981,15 @@
         item.querySelector(".detail").textContent = `${files.length} файл(ов), полный файл не передается.`;
         item.querySelector("pre").textContent = reviewPackage.text;
         item.querySelector("button").addEventListener("click", async () => {
-          await request("/api/rules/review-package/complete", { method: "POST" });
-          diffList.innerHTML = "";
+          await completeRulesReview();
         });
         diffList.append(item);
+      }
+
+      async function completeRulesReview() {
+        await request("/api/rules/review-package/complete", { method: "POST" });
+        const status = await request("/api/rules?baseline=false", 10000);
+        renderRules(status);
       }
 
       async function refreshWidget(url, render, timeoutMs) {
