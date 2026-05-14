@@ -272,11 +272,19 @@
         padding: 8px 10px;
       }
 
-      .disk-list,
       .service-list {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
         gap: 6px;
+      }
+
+      .disk-list {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(260px, 1fr);
+        gap: 6px;
+        overflow-x: auto;
+        padding-bottom: 2px;
       }
 
       .rules-config {
