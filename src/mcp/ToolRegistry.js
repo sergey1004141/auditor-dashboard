@@ -326,10 +326,10 @@ export class ToolRegistry {
       secondary: usage.rateLimits?.secondary ?? null,
       display: {
         primary: usage.rateLimits?.primary
-          ? `${usage.rateLimits.primary.label}: ${usage.rateLimits.primary.remainingPercentFormatted} до ${usage.rateLimits.primary.resetsAtTime}`
+          ? `${usage.rateLimits.primary.label}: ${usage.rateLimits.primary.remainingPercentFormatted} осталось / ${usage.rateLimits.primary.usedPercentFormatted} использовано, сброс ${usage.rateLimits.primary.resetsAtTime}`
           : null,
         secondary: usage.rateLimits?.secondary
-          ? `${usage.rateLimits.secondary.label}: ${usage.rateLimits.secondary.remainingPercentFormatted} до ${usage.rateLimits.secondary.resetsAtTime}`
+          ? `${usage.rateLimits.secondary.label}: ${usage.rateLimits.secondary.remainingPercentFormatted} осталось / ${usage.rateLimits.secondary.usedPercentFormatted} использовано, сброс ${usage.rateLimits.secondary.resetsAtTime}`
           : null,
       },
       source: "local Codex token_count session logs",

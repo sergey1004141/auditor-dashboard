@@ -158,7 +158,7 @@
 
       .limit-row {
         display: grid;
-        grid-template-columns: minmax(70px, 1fr) 48px 44px;
+        grid-template-columns: minmax(70px, 1fr) 78px 44px;
         gap: 8px;
         align-items: center;
         font-size: 12px;
@@ -708,7 +708,10 @@
 
       function renderLimit(prefix, limit, fallbackLabel) {
         $(`${prefix}Label`).textContent = limit?.label || fallbackLabel;
-        $(`${prefix}Percent`).textContent = limit?.remainingPercentFormatted || "-";
+        $(`${prefix}Percent`).textContent = limit
+          ? `${limit.remainingPercentFormatted}/${limit.usedPercentFormatted}`
+          : "-";
+        $(`${prefix}Percent`).title = "осталось / использовано";
         $(`${prefix}Reset`).textContent = limit?.resetsAtTime || "-";
       }
 
