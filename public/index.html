@@ -156,6 +156,35 @@
         gap: 6px;
       }
 
+      .disks-card {
+        grid-template-columns: 46px minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr);
+        align-items: stretch;
+      }
+
+      .disks-card .label {
+        align-self: center;
+      }
+
+      .disks-card .disk-list {
+        grid-column: 2;
+        padding: 0;
+        align-self: stretch;
+        grid-auto-columns: minmax(150px, 1fr);
+      }
+
+      .disks-card .disk {
+        border: 0;
+        padding: 0;
+        background: transparent;
+        align-content: center;
+      }
+
+      .disks-card .detail {
+        font-size: 10px;
+        min-height: 12px;
+      }
+
       .limit-row {
         display: grid;
         grid-template-columns: minmax(70px, 1fr) 78px 44px;
@@ -543,13 +572,13 @@
             <span id="limitSecondaryReset">-</span>
           </div>
         </article>
+        <article class="card disks-card">
+          <div class="label">Disks</div>
+          <div class="disk-list" id="diskList"></div>
+        </article>
       </section>
 
       <section class="grid">
-        <article class="panel">
-          <header><h2>Disks</h2></header>
-          <div class="content disk-list" id="diskList"></div>
-        </article>
         <article class="panel">
           <header class="panel-header">
             <h2>Правила ИИ</h2>
