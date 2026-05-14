@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { TaskHistoryParser } from "./TaskHistoryParser.js";
 
 const { readdir, readFile, stat } = fs;
 const DEFAULT_TASKS_ROOT = "\\\\HOME_SERGEY\\codex$";
@@ -7,9 +8,11 @@ const DEFAULT_TASKS_ROOT = "\\\\HOME_SERGEY\\codex$";
 export class TaskHistoryService {
   constructor({
     tasksRoot = process.env.AUDITOR_TASKS_ROOT ?? DEFAULT_TASKS_ROOT,
+    parser = new TaskHistoryParser(),
   } = {}) {
     this.tasksRoot = tasksRoot;
     this.taskMemoryRoot = path.win32.join(this.tasksRoot, "task-memory");
+    this.parser = parser;
   }
 
   async status() {
@@ -19,9 +22,7 @@ export class TaskHistoryService {
     for (const file of files) {
       const dev = this.devFromFile(file.name);
       const raw = await readFile(file.absolute, "utf8");
-      for (const line of raw.split(/\r?\n/)) {
-        const task = this.parseTaskLine(line);
-        if (!task) continue;
+      for (const task of this.parser.parseWorkedTasks(raw)) {
         const history = await this.historyInfo(task.name);
         rows.push({
           task: task.name,
@@ -37,8 +38,7 @@ export class TaskHistoryService {
       }
     }
 
-    const uniqueRows = this.latestRowsByTask(rows);
-    uniqueRows.sort((left, right) => this.compareRowsByModified(left, right));
+    const uniqueRows = this.parser.sortRowsByModified(this.parser.latestRowsByTask(rows));
 
     return {
       available: true,
@@ -91,18 +91,6 @@ export class TaskHistoryService {
     return match ? match[1] : fileName;
   }
 
-  parseTaskLine(line) {
-    const text = line.trim();
-    if (!text) return null;
-    const match = text.match(/^([A-Za-z]+-\d+)\s+-\s+(.+?)(?:\s+\[([^\]]+)\])?$/);
-    if (!match) return null;
-    return {
-      name: match[1],
-      status: match[2].trim(),
-      modified: match[3]?.replace(/\s+MSK$/i, "") ?? null,
-    };
-  }
-
   async historyInfo(taskName) {
     const historyPath = path.win32.join(this.taskMemoryRoot, `${taskName}.md`);
     try {
@@ -119,29 +107,6 @@ export class TaskHistoryService {
         modified: null,
       };
     }
-  }
-
-  sortTime(value) {
-    if (!value) return 0;
-    const parsed = Date.parse(value.replace(" ", "T"));
-    return Number.isNaN(parsed) ? 0 : parsed;
-  }
-
-  latestRowsByTask(rows) {
-    const latestByTask = new Map();
-    for (const row of rows) {
-      const current = latestByTask.get(row.task);
-      if (!current || this.sortTime(row.modified) >= this.sortTime(current.modified)) {
-        latestByTask.set(row.task, row);
-      }
-    }
-    return [...latestByTask.values()];
-  }
-
-  compareRowsByModified(left, right) {
-    const timeDiff = this.sortTime(right.modified) - this.sortTime(left.modified);
-    if (timeDiff !== 0) return timeDiff;
-    return left.task.localeCompare(right.task, "ru", { numeric: true });
   }
 
   formatMsk(date) {

@@ -8,9 +8,15 @@ export class DashboardServer {
       host = process.env.HOST ?? "127.0.0.1",
       port = 3777,
       allowedSubnet = process.env.PROJECT_WATCH_ALLOWED_SUBNET ?? "192.168.1.",
+      systemStatusService = null,
+      tokenUsageService = null,
+      taskHistoryService = null,
     } = {},
   ) {
     this.toolRegistry = toolRegistry;
+    this.systemStatusService = systemStatusService;
+    this.tokenUsageService = tokenUsageService;
+    this.taskHistoryService = taskHistoryService;
     this.host = host;
     this.port = port;
     this.allowedSubnet = allowedSubnet;
@@ -78,12 +84,12 @@ export class DashboardServer {
 
       if (request.method === "GET" && url.pathname === "/api/system") {
         const [summary, services, rdp, network, power, events] = await Promise.all([
-          this.callToolJson("system_summary", {}),
-          this.callToolJson("system_services", {}),
-          this.callToolJson("rdp_status", {}),
-          this.callToolJson("network_status", {}),
-          this.callToolJson("power_status", {}),
-          this.callToolJson("recent_system_events", { hours: 24, maxEvents: 12 }),
+          this.requireSystemStatus().summary(),
+          this.requireSystemStatus().services(),
+          this.requireSystemStatus().rdpStatus(),
+          this.requireSystemStatus().networkStatus(),
+          this.requireSystemStatus().powerStatus(),
+          this.requireSystemStatus().recentEvents({ hours: 24, maxEvents: 12 }),
         ]);
         this.sendJson(response, 200, { summary, services, rdp, network, power, events });
         return;
@@ -97,14 +103,14 @@ export class DashboardServer {
       }
 
       if (request.method === "GET" && url.pathname === "/api/tasks") {
-        await this.sendToolResult(response, "task_history", {});
+        this.sendJson(response, 200, await this.requireTaskHistory().status());
         return;
       }
 
       if (request.method === "GET" && url.pathname.startsWith("/api/tasks/history/")) {
         const encodedName = url.pathname.slice("/api/tasks/history/".length);
         const task = decodeURIComponent(encodedName).replace(/\.md$/i, "");
-        const history = await this.callToolJson("task_history_file", { task });
+        const history = await this.requireTaskHistory().readHistory(task);
         this.sendText(response, 200, history.content, {
           "content-type": "text/markdown; charset=utf-8",
           "x-task-history-path": history.path,
@@ -113,32 +119,32 @@ export class DashboardServer {
       }
 
       if (request.method === "GET" && url.pathname === "/api/metrics") {
-        this.sendJson(response, 200, await this.getCachedTool("runtime_metrics"));
+        this.sendJson(response, 200, await this.getCachedRuntimeMetrics());
         return;
       }
 
       if (request.method === "GET" && url.pathname === "/api/metrics/cpu") {
-        this.sendJson(response, 200, await this.callToolJson("cpu_metrics", {}));
+        this.sendJson(response, 200, await this.requireSystemStatus().cpuMetrics());
         return;
       }
 
       if (request.method === "GET" && url.pathname === "/api/metrics/memory") {
-        this.sendJson(response, 200, await this.callToolJson("memory_metrics", {}));
+        this.sendJson(response, 200, await this.requireSystemStatus().memoryMetrics());
         return;
       }
 
       if (request.method === "GET" && url.pathname === "/api/metrics/disks") {
-        this.sendJson(response, 200, await this.callToolJson("disk_metrics", {}));
+        this.sendJson(response, 200, await this.requireSystemStatus().diskMetrics());
         return;
       }
 
       if (request.method === "GET" && url.pathname === "/api/metrics/gpu") {
-        this.sendJson(response, 200, await this.callToolJson("gpu_metrics", {}));
+        this.sendJson(response, 200, await this.requireSystemStatus().gpuMetrics());
         return;
       }
 
       if (request.method === "GET" && url.pathname === "/api/tokens") {
-        this.sendJson(response, 200, await this.callToolJson("token_usage", {}));
+        this.sendJson(response, 200, await this.requireTokenUsage().status());
         return;
       }
 
@@ -174,6 +180,27 @@ export class DashboardServer {
     this.sendJson(response, 200, await this.callToolJson(name, args));
   }
 
+  requireTaskHistory() {
+    if (!this.taskHistoryService) {
+      throw new Error("Task history service is not configured.");
+    }
+    return this.taskHistoryService;
+  }
+
+  requireSystemStatus() {
+    if (!this.systemStatusService) {
+      throw new Error("System status service is not configured.");
+    }
+    return this.systemStatusService;
+  }
+
+  requireTokenUsage() {
+    if (!this.tokenUsageService) {
+      throw new Error("Token usage service is not configured.");
+    }
+    return this.tokenUsageService;
+  }
+
   async callToolJson(name, args) {
     const result = await this.toolRegistry.call(name, args);
     return JSON.parse(result.content[0].text);
@@ -188,8 +215,8 @@ export class DashboardServer {
     };
   }
 
-  async getCachedTool(toolName) {
-    const cache = this.metricsCache[toolName];
+  async getCachedRuntimeMetrics() {
+    const cache = this.metricsCache.runtime_metrics;
     const now = Date.now();
     if (cache.value && now - cache.updatedAt < cache.ttlMs) {
       return {
@@ -202,7 +229,7 @@ export class DashboardServer {
     }
 
     if (!cache.pending) {
-      cache.pending = this.callToolJson(toolName, {})
+      cache.pending = this.requireSystemStatus().runtimeMetrics()
         .then((value) => {
           cache.value = value;
           cache.updatedAt = Date.now();

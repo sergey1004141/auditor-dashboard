@@ -22,13 +22,16 @@ const projectMonitor = new ProjectMonitor();
 await projectMonitor.initialize();
 const rulesMonitor = new RulesMonitor();
 await rulesMonitor.initialize();
+const systemStatusService = new SystemStatusService();
+const tokenUsageService = new TokenUsageService();
+const taskHistoryService = new TaskHistoryService();
 
 const toolRegistry = new ToolRegistry(
   projectMonitor,
-  new SystemStatusService(),
+  systemStatusService,
   rulesMonitor,
-  new TokenUsageService(),
-  new TaskHistoryService(),
+  tokenUsageService,
+  taskHistoryService,
 );
 
 process.on("SIGINT", () => {
@@ -49,6 +52,9 @@ if (process.argv.includes("--web")) {
       "--allow-subnet",
       process.env.PROJECT_WATCH_ALLOWED_SUBNET ?? "192.168.1.",
     ),
+    systemStatusService,
+    tokenUsageService,
+    taskHistoryService,
   }).start();
 } else {
   new McpStdioServer(toolRegistry).start();
