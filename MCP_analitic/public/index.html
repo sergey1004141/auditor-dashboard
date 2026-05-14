@@ -567,6 +567,16 @@
         background: #fff5f5;
       }
 
+      .finding.error {
+        border-left-color: var(--bad);
+        background: #fff5f5;
+      }
+
+      .finding.info {
+        border-left-color: var(--accent);
+        background: #f4fbfc;
+      }
+
       .finding .detail {
         margin-top: 3px;
         white-space: normal;
@@ -1009,7 +1019,7 @@
 
         for (const notification of notifications) {
           const item = document.createElement("div");
-          item.className = `finding ${notification.severity === "critical" ? "critical" : ""}`;
+          item.className = `finding ${["critical", "error", "info"].includes(notification.severity) ? notification.severity : ""}`;
           item.innerHTML = `
             <div class="finding-top">
               <strong></strong>

@@ -523,8 +523,8 @@ export class RulesMonitor {
           reviewMessage: this.cleanReviewMessage(reviewMessage),
         };
         await this.saveReviewHistory(historyEntry);
-        if (historyEntry.reviewMessage) {
-          await this.saveRuleNotification(this.reviewNotification(historyEntry));
+        for (const notification of this.reviewNotifications(historyEntry)) {
+          await this.saveRuleNotification(notification);
         }
       }
       await rm(path.join(this.reviewDir, `${id}.diff`), { force: true });
@@ -574,10 +574,11 @@ export class RulesMonitor {
 
     for (const entry of reviewHistory) {
       if (!entry.reviewMessage || entry.reviewMessage === "Разобрано без текста AI-замечаний.") continue;
-      const notification = this.reviewNotification(entry);
-      if (!existingSourceIds.has(notification.sourceId) && !completedSourceIds.has(notification.sourceId)) {
-        await this.saveRuleNotification(notification);
-        existingSourceIds.add(notification.sourceId);
+      for (const notification of this.reviewNotifications(entry)) {
+        if (!existingSourceIds.has(notification.sourceId) && !completedSourceIds.has(notification.sourceId)) {
+          await this.saveRuleNotification(notification);
+          existingSourceIds.add(notification.sourceId);
+        }
       }
     }
 
@@ -607,6 +608,112 @@ export class RulesMonitor {
     };
   }
 
+  reviewNotifications(entry) {
+    const files = this.reviewFileMetadata(entry.files ?? []).map((file) => file.file).filter(Boolean).join(", ");
+    const message = this.cleanReviewMessage(entry.reviewMessage);
+    if (!message || /^DONT_NOTIFY\b/i.test(message)) return [];
+
+    const parsed = this.parseReviewMessage(message, entry);
+    if (parsed.length) return parsed;
+
+    return [{
+      sourceId: this.notificationSourceId(["ai-review", entry.id, message]),
+      source: "ai-review",
+      severity: "info",
+      title: `info / ai-review / ${files || entry.id}`,
+      detail: [entry.completedAt, files].filter(Boolean).join(" / "),
+      quote: message,
+      suggestion: "",
+    }];
+  }
+
+  parseReviewMessage(message, entry) {
+    const lines = message.split("\n").map((line) => line.trim()).filter(Boolean);
+    const chunks = [];
+    let current = null;
+
+    for (const line of lines) {
+      if (this.isReviewItemStart(line)) {
+        if (current) chunks.push(current);
+        current = [line];
+      } else if (/^([-*]|\d+[.)])\s+/.test(line)) {
+        if (current) chunks.push(current);
+        current = null;
+      } else if (current) {
+        current.push(line);
+      }
+    }
+    if (current) chunks.push(current);
+
+    return chunks
+      .map((chunk, index) => this.reviewChunkNotification(chunk, entry, index))
+      .filter(Boolean);
+  }
+
+  isReviewItemStart(line) {
+    if (!/^([-*]|\d+[.)])\s+/.test(line)) return false;
+    const body = line.replace(/^([-*]|\d+[.)])\s+/, "").trim();
+    if (/^(статус риска|подозрительные изменения|четкие|чёткие|решение)\b/i.test(body)) return false;
+    return /(\.(md|txt|json|ya?ml|rules)(:\d+)?\b|warning|error|critical|info|критич|ошибк|подозр|риск|ослаб|лазейк|исключен)/i.test(body);
+  }
+
+  reviewChunkNotification(chunk, entry, index) {
+    const text = chunk.join("\n").replace(/^([-*]|\d+[.)])\s+/, "").trim();
+    if (!text || /^DONT_NOTIFY\b/i.test(text)) return null;
+
+    const severity = this.reviewSeverity(text);
+    const place = this.reviewPlace(text, entry) || `diff:${index + 1}`;
+    const quote = this.reviewQuote(text);
+    const suggestion = this.reviewSuggestion(text);
+    const detail = this.reviewDetail(text);
+
+    return {
+      sourceId: this.notificationSourceId(["ai-review-item", entry.id, index, severity, place, quote || text]),
+      source: "ai-review",
+      severity,
+      title: `${severity} / ai-review / ${place}`,
+      detail,
+      quote: quote || text,
+      suggestion,
+    };
+  }
+
+  reviewSeverity(text) {
+    const lower = text.toLowerCase();
+    if (/(critical|критич|опасн|запрещ|уязвим|ошибк|error)/i.test(lower)) return "error";
+    if (/(warning|подозр|риск|ослаб|лазейк|исключен)/i.test(lower)) return "warning";
+    return "info";
+  }
+
+  reviewPlace(text, entry) {
+    const direct = text.match(/([A-Za-z0-9_. -]+\.(?:md|txt|json|ya?ml|rules))(?::(\d+))?/i);
+    if (direct) return [direct[1].trim(), direct[2]].filter(Boolean).join(":");
+    const files = this.reviewFileMetadata(entry.files ?? []).map((file) => file.file).filter(Boolean);
+    return files[0] ?? "";
+  }
+
+  reviewQuote(text) {
+    const diffLine = text.split("\n").find((line) => /^[-+]\s+/.test(line));
+    if (diffLine) return diffLine.trim();
+    const quoted = text.match(/["'«`](.+?)["'»`]/s);
+    if (quoted) return quoted[1].trim();
+    return text.split("\n")[0]?.trim() ?? "";
+  }
+
+  reviewSuggestion(text) {
+    const line = text.split("\n").find((item) => /(?:заменить|предложение|правка|формулировка|replace|suggestion)\s*:?/i.test(item));
+    if (!line) return "";
+    return line.replace(/^.*?(?:заменить|предложение|правка|формулировка|replace|suggestion)\s*:?/i, "").trim();
+  }
+
+  reviewDetail(text) {
+    const firstLine = text.split("\n")[0] ?? "";
+    const cleaned = firstLine
+      .replace(/\s*(?:заменить|предложение|правка|формулировка|replace|suggestion)\s*:?.*$/i, "")
+      .trim();
+    return cleaned || "AI-анализ diff правил.";
+  }
+
   reviewNotification(entry) {
     const files = this.reviewFileMetadata(entry.files ?? []).map((file) => file.file).filter(Boolean).join(", ");
     return {
@@ -622,7 +729,7 @@ export class RulesMonitor {
 
   async saveRuleNotification(notification) {
     const createdAt = new Date().toISOString();
-    const id = this.notificationId(notification.sourceId, createdAt);
+    const id = this.notificationId(notification.sourceId, createdAt, notification.severity);
     const payload = {
       id,
       createdAt,
@@ -656,7 +763,7 @@ export class RulesMonitor {
   }
 
   async completeRuleNotification(id) {
-    if (!/^warning_\d{8}-\d{6}_[A-Za-z0-9_-]+$/.test(id)) {
+    if (!/^(warning|error|critical|info)_\d{8}-\d{6}_[A-Za-z0-9_-]+$/.test(id)) {
       throw new Error("Invalid notification id.");
     }
     const notification = await this.loadRuleNotification(id).catch(() => null);
@@ -706,9 +813,17 @@ export class RulesMonitor {
     return createHash("sha256").update(parts.filter(Boolean).join("|")).digest("hex").slice(0, 16);
   }
 
-  notificationId(sourceId, createdAt) {
+  notificationId(sourceId, createdAt, severity = "warning") {
     const stamp = createdAt.replace(/\D/g, "").slice(0, 14);
-    return `warning_${stamp.slice(0, 8)}-${stamp.slice(8, 14)}_${sourceId}`;
+    const prefix = this.notificationPrefix(severity);
+    return `${prefix}_${stamp.slice(0, 8)}-${stamp.slice(8, 14)}_${sourceId}`;
+  }
+
+  notificationPrefix(severity) {
+    if (severity === "critical") return "critical";
+    if (severity === "error") return "error";
+    if (severity === "info") return "info";
+    return "warning";
   }
 
   async listReviewHistory({ limit = 5 } = {}) {
