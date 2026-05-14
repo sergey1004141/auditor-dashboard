@@ -420,6 +420,25 @@
         font-size: 11px;
       }
 
+      .rules-diff-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .rules-diff button {
+        border: 0;
+        border-radius: 6px;
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+        font: inherit;
+        font-size: 11px;
+        font-weight: 800;
+        padding: 5px 8px;
+      }
+
       .task-table {
         width: 100%;
         min-width: 720px;
@@ -951,13 +970,20 @@
         const item = document.createElement("div");
         item.className = "rules-diff";
         item.innerHTML = `
-          <strong>Diff для AI-анализа</strong>
+          <div class="rules-diff-top">
+            <strong>Diff для AI-анализа</strong>
+            <button type="button">Выполнено</button>
+          </div>
           <div class="detail"></div>
           <pre></pre>
         `;
         const files = Array.isArray(reviewPackage.files) ? reviewPackage.files : [];
         item.querySelector(".detail").textContent = `${files.length} файл(ов), полный файл не передается.`;
         item.querySelector("pre").textContent = reviewPackage.text;
+        item.querySelector("button").addEventListener("click", async () => {
+          await request("/api/rules/review-package/complete", { method: "POST" });
+          diffList.innerHTML = "";
+        });
         diffList.append(item);
       }
 

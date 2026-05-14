@@ -104,6 +104,18 @@ export class DashboardServer {
         return;
       }
 
+      if (request.method === "GET" && url.pathname === "/api/rules/review-package") {
+        this.sendJson(response, 200, await this.requireRulesMonitor().pendingReview({
+          complete: url.searchParams.get("complete") === "true",
+        }));
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/rules/review-package/complete") {
+        this.sendJson(response, 200, await this.requireRulesMonitor().completeReview());
+        return;
+      }
+
       if (request.method === "GET" && url.pathname === "/api/tasks") {
         this.sendJson(response, 200, await this.requireTaskHistory().status());
         return;

@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { RULES_BASELINE_FILE } from "../config.js";
+import { RULES_BASELINE_FILE, RULES_REVIEW_QUEUE_FILE } from "../config.js";
 import { ConfigStore } from "./ConfigStore.js";
 import { RulesDiff } from "./RulesDiff.js";
 
-const { mkdir, readFile, readdir, stat, writeFile } = fs;
+const { mkdir, readFile, readdir, rm, stat, writeFile } = fs;
 
 const RULE_EXTENSIONS = new Set([".md", ".txt", ".json", ".yaml", ".yml", ".rules"]);
 const MAX_RULE_FILES = 500;
@@ -20,6 +20,7 @@ export class RulesMonitor {
       disabled: process.env.PROJECT_WATCH_DISABLE_CONFIG === "1",
     }),
     baselineFile = RULES_BASELINE_FILE,
+    reviewQueueFile = RULES_REVIEW_QUEUE_FILE,
     rulesDiff = new RulesDiff(),
   } = {}) {
     this.rulesPath = initialRulesPath ? path.resolve(initialRulesPath) : null;
@@ -28,6 +29,7 @@ export class RulesMonitor {
     this.rulesConfiguredAt = null;
     this.configStore = configStore;
     this.baselineFile = baselineFile;
+    this.reviewQueueFile = reviewQueueFile;
     this.rulesDiff = rulesDiff;
   }
 
@@ -86,7 +88,10 @@ export class RulesMonitor {
       const scan = await this.scanRules();
       const changes = this.compare(previous.files ?? [], scan.files);
       const findings = this.analyze(scan.documents, changes);
-      const reviewPackage = this.rulesDiff.build(previous.documents ?? [], scan.documents, changes);
+      const freshReviewPackage = this.rulesDiff.build(previous.documents ?? [], scan.documents, changes);
+      const reviewPackage = freshReviewPackage.available
+        ? await this.saveReviewPackage(freshReviewPackage)
+        : await this.loadReviewPackage();
 
       if (updateBaseline) {
         await this.saveBaseline(scan);
@@ -117,10 +122,7 @@ export class RulesMonitor {
         error: error.message,
         changes: { added: [], modified: [], deleted: [] },
         reviewPackage: {
-          available: false,
-          mode: "local-diff",
-          files: [],
-          text: "",
+          ...this.emptyReviewPackage(),
           note: "Diff недоступен, потому что файл правил не читается.",
         },
         findings: [
@@ -427,6 +429,62 @@ export class RulesMonitor {
     } catch {
       return { files: [] };
     }
+  }
+
+  async loadReviewPackage() {
+    try {
+      return JSON.parse(await readFile(this.reviewQueueFile, "utf8"));
+    } catch {
+      return this.emptyReviewPackage();
+    }
+  }
+
+  async saveReviewPackage(reviewPackage) {
+    const payload = {
+      ...reviewPackage,
+      available: true,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      role: this.rulesRole,
+      rulesPath: this.rulesPath,
+      rulesFile: this.rulesFile,
+    };
+    await mkdir(path.dirname(this.reviewQueueFile), { recursive: true });
+    await writeFile(this.reviewQueueFile, JSON.stringify(payload, null, 2), "utf8");
+    return payload;
+  }
+
+  async pendingReview({ complete = false } = {}) {
+    const reviewPackage = await this.loadReviewPackage();
+    if (complete && reviewPackage.available) {
+      await this.completeReview();
+      return {
+        ...reviewPackage,
+        status: "completed",
+        completedAt: new Date().toISOString(),
+      };
+    }
+    return reviewPackage;
+  }
+
+  async completeReview() {
+    await rm(this.reviewQueueFile, { force: true });
+    return this.emptyReviewPackage({
+      status: "completed",
+      completedAt: new Date().toISOString(),
+    });
+  }
+
+  emptyReviewPackage(extra = {}) {
+    return {
+      available: false,
+      mode: "local-diff",
+      status: "empty",
+      files: [],
+      text: "",
+      note: "Нет ожидающих diff для AI-анализа.",
+      ...extra,
+    };
   }
 
   async saveBaseline(scan) {

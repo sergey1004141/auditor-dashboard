@@ -10,6 +10,7 @@ export const MAX_RECENT_EVENTS = 300;
 export const CONFIG_DIR = path.join(os.homedir(), ".windows-project-watch-mcp");
 export const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
 export const RULES_BASELINE_FILE = path.join(CONFIG_DIR, "rules-baseline.json");
+export const RULES_REVIEW_QUEUE_FILE = path.join(CONFIG_DIR, "rules-review-queue.json");
 export const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const PUBLIC_DIR = path.join(APP_ROOT, "public");
 
