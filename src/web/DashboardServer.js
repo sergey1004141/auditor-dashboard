@@ -96,6 +96,22 @@ export class DashboardServer {
         return;
       }
 
+      if (request.method === "GET" && url.pathname === "/api/tasks") {
+        await this.sendToolResult(response, "task_history", {});
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname.startsWith("/api/tasks/history/")) {
+        const encodedName = url.pathname.slice("/api/tasks/history/".length);
+        const task = decodeURIComponent(encodedName).replace(/\.md$/i, "");
+        const history = await this.callToolJson("task_history_file", { task });
+        this.sendText(response, 200, history.content, {
+          "content-type": "text/markdown; charset=utf-8",
+          "x-task-history-path": history.path,
+        });
+        return;
+      }
+
       if (request.method === "GET" && url.pathname === "/api/metrics") {
         this.sendJson(response, 200, await this.getCachedTool("runtime_metrics"));
         return;
@@ -225,5 +241,14 @@ export class DashboardServer {
       "cache-control": "no-store",
     });
     response.end(body);
+  }
+
+  sendText(response, status, payload, headers = {}) {
+    response.writeHead(status, {
+      "content-type": "text/plain; charset=utf-8",
+      "cache-control": "no-store",
+      ...headers,
+    });
+    response.end(payload);
   }
 }

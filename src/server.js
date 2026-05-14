@@ -2,6 +2,7 @@
 import { ProjectMonitor } from "./core/ProjectMonitor.js";
 import { RulesMonitor } from "./core/RulesMonitor.js";
 import { SystemStatusService } from "./core/SystemStatusService.js";
+import { TaskHistoryService } from "./core/TaskHistoryService.js";
 import { TokenUsageService } from "./core/TokenUsageService.js";
 import { McpStdioServer } from "./mcp/McpStdioServer.js";
 import { ToolRegistry } from "./mcp/ToolRegistry.js";
@@ -27,6 +28,7 @@ const toolRegistry = new ToolRegistry(
   new SystemStatusService(),
   rulesMonitor,
   new TokenUsageService(),
+  new TaskHistoryService(),
 );
 
 process.on("SIGINT", () => {

@@ -40,6 +40,10 @@ if (Test-Path $secretPath) {
     }
   }
 
+  if ($secret.shareRoot) {
+    $env:AUDITOR_TASKS_ROOT = $secret.shareRoot
+  }
+
   if ($secret.rulesPath) {
     $env:AUDITOR_RULES_PATH = $secret.rulesPath
   }

@@ -352,6 +352,44 @@
         margin-top: 8px;
       }
 
+      .task-table {
+        width: 100%;
+        min-width: 720px;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+
+      .task-table th,
+      .task-table td {
+        border-bottom: 1px solid var(--line);
+        padding: 6px 7px;
+        text-align: left;
+        vertical-align: middle;
+        white-space: nowrap;
+      }
+
+      .task-table th {
+        color: var(--muted);
+        font-weight: 800;
+        background: #fbfcfe;
+      }
+
+      .task-table td:nth-child(2) {
+        max-width: 260px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .task-table a {
+        color: var(--accent);
+        font-weight: 800;
+        text-decoration: none;
+      }
+
+      .task-table-wrap {
+        overflow-x: auto;
+      }
+
       .finding {
         border: 1px solid var(--line);
         border-left: 4px solid var(--warn);
@@ -503,6 +541,25 @@
         <article class="panel">
           <header><h2>Disks</h2></header>
           <div class="content disk-list" id="diskList"></div>
+        </article>
+        <article class="panel">
+          <header><h2>Задачи Dev</h2></header>
+          <div class="content task-table-wrap">
+            <table class="task-table">
+              <thead>
+                <tr>
+                  <th>Задача</th>
+                  <th>Статус</th>
+                  <th>Изменена</th>
+                  <th>Кто</th>
+                  <th>История</th>
+                </tr>
+              </thead>
+              <tbody id="taskHistoryRows">
+                <tr><td colspan="5">-</td></tr>
+              </tbody>
+            </table>
+          </div>
         </article>
         <article class="panel">
           <header class="panel-header">
@@ -697,6 +754,48 @@
         renderDisks(disks);
       }
 
+      function renderTaskHistory(history) {
+        const body = $("taskHistoryRows");
+        body.innerHTML = "";
+        const rows = Array.isArray(history.rows) ? history.rows : [];
+        if (rows.length === 0) {
+          const row = document.createElement("tr");
+          row.innerHTML = `<td colspan="5"></td>`;
+          row.querySelector("td").textContent = history.error || "Задачи не найдены.";
+          body.append(row);
+          return;
+        }
+
+        for (const task of rows) {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+          `;
+          row.children[0].textContent = task.task;
+          row.children[1].textContent = task.status || "-";
+          row.children[1].title = task.status || "";
+          row.children[2].textContent = task.modified || task.historyModified || "-";
+          row.children[3].textContent = task.developer || "-";
+          if (task.historyUrl) {
+            const link = document.createElement("a");
+            link.href = task.historyUrl;
+            link.target = "_blank";
+            link.rel = "noopener";
+            link.textContent = "открыть";
+            link.title = task.historyPath || "";
+            row.children[4].append(link);
+          } else {
+            row.children[4].textContent = "-";
+            row.children[4].title = task.historyPath || "";
+          }
+          body.append(row);
+        }
+      }
+
       function renderTokenUsage(tokens) {
         if (!tokens.available) {
           renderLimits(null);
@@ -784,6 +883,7 @@
         ["/api/metrics/disks", renderDiskMetrics, 60000, 5000],
         ["/api/tokens", renderTokenUsage, 60000, 10000],
         ["/api/rules", renderRules, 60000, 10000],
+        ["/api/tasks", renderTaskHistory, 60000, 10000],
       ];
 
       for (const [url, render, interval, timeoutMs] of loops) {

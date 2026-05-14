@@ -1,9 +1,16 @@
 export class ToolRegistry {
-  constructor(projectMonitor, systemStatusService = null, rulesMonitor = null, tokenUsageService = null) {
+  constructor(
+    projectMonitor,
+    systemStatusService = null,
+    rulesMonitor = null,
+    tokenUsageService = null,
+    taskHistoryService = null,
+  ) {
     this.projectMonitor = projectMonitor;
     this.systemStatusService = systemStatusService;
     this.rulesMonitor = rulesMonitor;
     this.tokenUsageService = tokenUsageService;
+    this.taskHistoryService = taskHistoryService;
   }
 
   list() {
@@ -209,6 +216,23 @@ export class ToolRegistry {
           additionalProperties: false,
         },
       },
+      {
+        name: "task_history",
+        description: "Return Dev worked task rows from Dev<ID>_WORKED_TASKS.md and links to task-memory history files.",
+        inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      },
+      {
+        name: "task_history_file",
+        description: "Read one task history markdown file from task-memory by task id.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            task: { type: "string", description: "Task id, for example IAINT-1152." },
+          },
+          required: ["task"],
+          additionalProperties: false,
+        },
+      },
     ];
   }
 
@@ -272,6 +296,10 @@ export class ToolRegistry {
             updateBaseline: args.updateBaseline !== false,
           }),
         );
+      case "task_history":
+        return this.result(await this.requireTaskHistory().status());
+      case "task_history_file":
+        return this.result(await this.requireTaskHistory().readHistory(args.task));
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
@@ -296,6 +324,13 @@ export class ToolRegistry {
       throw new Error("Token usage service is not configured.");
     }
     return this.tokenUsageService;
+  }
+
+  requireTaskHistory() {
+    if (!this.taskHistoryService) {
+      throw new Error("Task history service is not configured.");
+    }
+    return this.taskHistoryService;
   }
 
   async systemSummary() {
