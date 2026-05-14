@@ -153,7 +153,7 @@
 
       .limits-card {
         grid-template-columns: 1fr;
-        gap: 6px;
+        gap: 4px;
       }
 
       .disks-card {
@@ -193,6 +193,12 @@
         font-size: 12px;
       }
 
+      .limit-row.header {
+        font-size: 10px;
+        line-height: 1;
+        color: var(--muted);
+      }
+
       .limit-row strong {
         font-weight: 850;
       }
@@ -201,6 +207,10 @@
         color: var(--muted);
         text-align: right;
         font-variant-numeric: tabular-nums;
+      }
+
+      .limit-row.header span {
+        font-weight: 800;
       }
 
       .bar-fill {
@@ -561,6 +571,11 @@
           <div class="detail" id="diskDetail">used / total</div>
         </article>
         <article class="card limits-card">
+          <div class="limit-row header" aria-hidden="true">
+            <span></span>
+            <span>ост./исп.</span>
+            <span>сброс</span>
+          </div>
           <div class="limit-row">
             <strong id="limitPrimaryLabel">5ч</strong>
             <span id="limitPrimaryPercent">-</span>
