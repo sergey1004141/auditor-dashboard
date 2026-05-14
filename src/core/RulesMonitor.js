@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { RULES_BASELINE_FILE } from "../config.js";
 import { ConfigStore } from "./ConfigStore.js";
+import { RulesDiff } from "./RulesDiff.js";
 
 const { mkdir, readFile, readdir, stat, writeFile } = fs;
 
@@ -19,6 +20,7 @@ export class RulesMonitor {
       disabled: process.env.PROJECT_WATCH_DISABLE_CONFIG === "1",
     }),
     baselineFile = RULES_BASELINE_FILE,
+    rulesDiff = new RulesDiff(),
   } = {}) {
     this.rulesPath = initialRulesPath ? path.resolve(initialRulesPath) : null;
     this.rulesFile = initialRulesFile ? path.resolve(initialRulesFile) : null;
@@ -26,6 +28,7 @@ export class RulesMonitor {
     this.rulesConfiguredAt = null;
     this.configStore = configStore;
     this.baselineFile = baselineFile;
+    this.rulesDiff = rulesDiff;
   }
 
   async initialize() {
@@ -47,7 +50,7 @@ export class RulesMonitor {
     this.rulesConfiguredAt = new Date().toISOString();
     await this.ensureSource();
     const scan = await this.scanRules();
-    await this.saveBaseline(scan.files);
+    await this.saveBaseline(scan);
     await this.configStore.save({
       rulesPath: this.rulesPath,
       rulesFile: this.rulesFile,
@@ -83,9 +86,10 @@ export class RulesMonitor {
       const scan = await this.scanRules();
       const changes = this.compare(previous.files ?? [], scan.files);
       const findings = this.analyze(scan.documents, changes);
+      const reviewPackage = this.rulesDiff.build(previous.documents ?? [], scan.documents, changes);
 
       if (updateBaseline) {
-        await this.saveBaseline(scan.files);
+        await this.saveBaseline(scan);
       }
 
       return {
@@ -98,6 +102,7 @@ export class RulesMonitor {
         trackedFiles: scan.files.length,
         changes,
         findings,
+        reviewPackage,
         accessNote: this.networkAccessNote(),
       };
     } catch (error) {
@@ -111,6 +116,13 @@ export class RulesMonitor {
         sampledAt: new Date().toISOString(),
         error: error.message,
         changes: { added: [], modified: [], deleted: [] },
+        reviewPackage: {
+          available: false,
+          mode: "local-diff",
+          files: [],
+          text: "",
+          note: "Diff недоступен, потому что файл правил не читается.",
+        },
         findings: [
           {
             severity: "critical",
@@ -417,7 +429,7 @@ export class RulesMonitor {
     }
   }
 
-  async saveBaseline(files) {
+  async saveBaseline(scan) {
     await mkdir(path.dirname(this.baselineFile), { recursive: true });
     await writeFile(
       this.baselineFile,
@@ -427,7 +439,12 @@ export class RulesMonitor {
       rulesPath: this.rulesPath,
       rulesFile: this.rulesFile,
       role: this.rulesRole,
-      files,
+      files: scan.files,
+      documents: scan.documents.map((document) => ({
+        file: document.file,
+        text: document.text,
+        lines: document.lines,
+      })),
         },
         null,
         2,

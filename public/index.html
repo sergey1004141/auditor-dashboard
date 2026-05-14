@@ -405,6 +405,21 @@
         margin-top: 8px;
       }
 
+      .rules-diff {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #fbfcfe;
+        padding: 7px 8px;
+        font-size: 12px;
+      }
+
+      .rules-diff pre {
+        margin-top: 6px;
+        max-height: 180px;
+        overflow: auto;
+        font-size: 11px;
+      }
+
       .task-table {
         width: 100%;
         min-width: 720px;
@@ -625,6 +640,7 @@
               <button type="submit">Сохранить</button>
             </form>
             <div class="rules-list" id="rulesFindings"></div>
+            <div class="rules-list" id="rulesDiff"></div>
           </div>
         </article>
         <article class="panel">
@@ -887,7 +903,10 @@
         $("rulesChanges").textContent = changeCount;
 
         const list = $("rulesFindings");
+        const diffList = $("rulesDiff");
         list.innerHTML = "";
+        diffList.innerHTML = "";
+        renderRulesDiff(status.reviewPackage);
         const findings = Array.isArray(status.findings) ? status.findings.slice(0, 10) : [];
         const criticalFindings = findings.filter((finding) => finding.severity === "critical");
         if (criticalFindings.length) {
@@ -923,6 +942,23 @@
             : "Предложение: уточнить формулировку и убрать возможную лазейку.";
           list.append(item);
         }
+      }
+
+      function renderRulesDiff(reviewPackage) {
+        const diffList = $("rulesDiff");
+        if (!reviewPackage?.available || !reviewPackage.text) return;
+
+        const item = document.createElement("div");
+        item.className = "rules-diff";
+        item.innerHTML = `
+          <strong>Diff для AI-анализа</strong>
+          <div class="detail"></div>
+          <pre></pre>
+        `;
+        const files = Array.isArray(reviewPackage.files) ? reviewPackage.files : [];
+        item.querySelector(".detail").textContent = `${files.length} файл(ов), полный файл не передается.`;
+        item.querySelector("pre").textContent = reviewPackage.text;
+        diffList.append(item);
       }
 
       async function refreshWidget(url, render, timeoutMs) {

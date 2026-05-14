@@ -8,12 +8,14 @@ export class DashboardServer {
       host = process.env.HOST ?? "127.0.0.1",
       port = 3777,
       allowedSubnet = process.env.PROJECT_WATCH_ALLOWED_SUBNET ?? "192.168.1.",
+      rulesMonitor = null,
       systemStatusService = null,
       tokenUsageService = null,
       taskHistoryService = null,
     } = {},
   ) {
     this.toolRegistry = toolRegistry;
+    this.rulesMonitor = rulesMonitor;
     this.systemStatusService = systemStatusService;
     this.tokenUsageService = tokenUsageService;
     this.taskHistoryService = taskHistoryService;
@@ -96,9 +98,9 @@ export class DashboardServer {
       }
 
       if (request.method === "GET" && url.pathname === "/api/rules") {
-        await this.sendToolResult(response, "rules_status", {
+        this.sendJson(response, 200, await this.requireRulesMonitor().status({
           updateBaseline: url.searchParams.get("baseline") !== "false",
-        });
+        }));
         return;
       }
 
@@ -199,6 +201,13 @@ export class DashboardServer {
       throw new Error("Token usage service is not configured.");
     }
     return this.tokenUsageService;
+  }
+
+  requireRulesMonitor() {
+    if (!this.rulesMonitor) {
+      throw new Error("Rules monitor is not configured.");
+    }
+    return this.rulesMonitor;
   }
 
   async callToolJson(name, args) {

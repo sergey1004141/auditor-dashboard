@@ -52,6 +52,7 @@ if (process.argv.includes("--web")) {
       "--allow-subnet",
       process.env.PROJECT_WATCH_ALLOWED_SUBNET ?? "192.168.1.",
     ),
+    rulesMonitor,
     systemStatusService,
     tokenUsageService,
     taskHistoryService,
