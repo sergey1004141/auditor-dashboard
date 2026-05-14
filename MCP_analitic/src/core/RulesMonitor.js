@@ -42,6 +42,7 @@ export class RulesMonitor {
     this.reviewDir = reviewDir;
     this.reviewHistoryFile = reviewHistoryFile;
     this.notificationDir = notificationDir;
+    this.completedNotificationsFile = path.join(notificationDir, "completed.json");
     this.rulesDiff = rulesDiff;
   }
 
@@ -464,6 +465,13 @@ export class RulesMonitor {
   }
 
   async saveReviewPackage(reviewPackage, { includeText = false } = {}) {
+    const existing = await this.findPendingReviewByHash(this.reviewPackageHash(reviewPackage));
+    if (existing?.available) {
+      if (!includeText) return existing;
+      const text = await readFile(existing.diffFile, "utf8");
+      return { ...existing, text };
+    }
+
     const id = this.reviewPackageId(reviewPackage);
     const diffFile = path.join(this.reviewDir, `${id}.diff`);
     const metadataFile = path.join(this.reviewDir, `${id}.json`);
@@ -554,10 +562,11 @@ export class RulesMonitor {
   async syncRuleNotifications({ findings = [], reviewHistory = [] } = {}) {
     const existing = await this.listRuleNotifications();
     const existingSourceIds = new Set(existing.map((item) => item.sourceId).filter(Boolean));
+    const completedSourceIds = await this.listCompletedNotificationSourceIds();
 
     for (const finding of findings) {
       const notification = this.findingNotification(finding);
-      if (!existingSourceIds.has(notification.sourceId)) {
+      if (!existingSourceIds.has(notification.sourceId) && !completedSourceIds.has(notification.sourceId)) {
         await this.saveRuleNotification(notification);
         existingSourceIds.add(notification.sourceId);
       }
@@ -566,7 +575,7 @@ export class RulesMonitor {
     for (const entry of reviewHistory) {
       if (!entry.reviewMessage || entry.reviewMessage === "Разобрано без текста AI-замечаний.") continue;
       const notification = this.reviewNotification(entry);
-      if (!existingSourceIds.has(notification.sourceId)) {
+      if (!existingSourceIds.has(notification.sourceId) && !completedSourceIds.has(notification.sourceId)) {
         await this.saveRuleNotification(notification);
         existingSourceIds.add(notification.sourceId);
       }
@@ -634,7 +643,7 @@ export class RulesMonitor {
 
     const notifications = [];
     for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+      if (!entry.isFile() || !entry.name.endsWith(".json") || entry.name === "completed.json") continue;
       try {
         const data = JSON.parse(await readFile(path.join(this.notificationDir, entry.name), "utf8"));
         notifications.push(this.sanitizeRuleNotification(data));
@@ -647,11 +656,36 @@ export class RulesMonitor {
   }
 
   async completeRuleNotification(id) {
-    if (!/^worning_\d{8}-\d{6}_[A-Za-z0-9_-]+$/.test(id)) {
+    if (!/^warning_\d{8}-\d{6}_[A-Za-z0-9_-]+$/.test(id)) {
       throw new Error("Invalid notification id.");
+    }
+    const notification = await this.loadRuleNotification(id).catch(() => null);
+    if (notification?.sourceId) {
+      await this.saveCompletedNotificationSourceId(notification.sourceId);
     }
     await rm(path.join(this.notificationDir, `${id}.json`), { force: true });
     return { ok: true, id, notifications: await this.listRuleNotifications() };
+  }
+
+  async loadRuleNotification(id) {
+    return this.sanitizeRuleNotification(JSON.parse(await readFile(path.join(this.notificationDir, `${id}.json`), "utf8")));
+  }
+
+  async listCompletedNotificationSourceIds() {
+    try {
+      const data = JSON.parse(await readFile(this.completedNotificationsFile, "utf8"));
+      if (!Array.isArray(data)) return new Set();
+      return new Set(data.map(String));
+    } catch {
+      return new Set();
+    }
+  }
+
+  async saveCompletedNotificationSourceId(sourceId) {
+    const completed = await this.listCompletedNotificationSourceIds();
+    completed.add(String(sourceId));
+    await mkdir(this.notificationDir, { recursive: true });
+    await writeFile(this.completedNotificationsFile, JSON.stringify([...completed].slice(-500), null, 2), "utf8");
   }
 
   sanitizeRuleNotification(data) {
@@ -674,7 +708,7 @@ export class RulesMonitor {
 
   notificationId(sourceId, createdAt) {
     const stamp = createdAt.replace(/\D/g, "").slice(0, 14);
-    return `worning_${stamp.slice(0, 8)}-${stamp.slice(8, 14)}_${sourceId}`;
+    return `warning_${stamp.slice(0, 8)}-${stamp.slice(8, 14)}_${sourceId}`;
   }
 
   async listReviewHistory({ limit = 5 } = {}) {
@@ -739,9 +773,18 @@ export class RulesMonitor {
   }
 
   reviewPackageId(reviewPackage) {
-    const hash = createHash("sha256").update(reviewPackage.text).digest("hex").slice(0, 12);
     const stamp = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
-    return `${stamp}-${hash}`;
+    return `${stamp}-${this.reviewPackageHash(reviewPackage)}`;
+  }
+
+  reviewPackageHash(reviewPackage) {
+    return createHash("sha256").update(reviewPackage.text).digest("hex").slice(0, 12);
+  }
+
+  async findPendingReviewByHash(hash) {
+    if (!hash) return null;
+    const packages = await this.listReviewPackages();
+    return packages.find((item) => item.id?.endsWith(`-${hash}`)) ?? null;
   }
 
   reviewFileMetadata(files = []) {
