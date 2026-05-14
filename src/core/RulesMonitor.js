@@ -1,7 +1,12 @@
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { RULES_BASELINE_FILE, RULES_REVIEW_DIR, RULES_REVIEW_QUEUE_FILE } from "../config.js";
+import {
+  RULES_BASELINE_FILE,
+  RULES_REVIEW_DIR,
+  RULES_REVIEW_HISTORY_FILE,
+  RULES_REVIEW_QUEUE_FILE,
+} from "../config.js";
 import { ConfigStore } from "./ConfigStore.js";
 import { RulesDiff } from "./RulesDiff.js";
 
@@ -22,6 +27,7 @@ export class RulesMonitor {
     baselineFile = RULES_BASELINE_FILE,
     reviewQueueFile = RULES_REVIEW_QUEUE_FILE,
     reviewDir = RULES_REVIEW_DIR,
+    reviewHistoryFile = RULES_REVIEW_HISTORY_FILE,
     rulesDiff = new RulesDiff(),
   } = {}) {
     this.rulesPath = initialRulesPath ? path.resolve(initialRulesPath) : null;
@@ -32,6 +38,7 @@ export class RulesMonitor {
     this.baselineFile = baselineFile;
     this.reviewQueueFile = reviewQueueFile;
     this.reviewDir = reviewDir;
+    this.reviewHistoryFile = reviewHistoryFile;
     this.rulesDiff = rulesDiff;
   }
 
@@ -110,6 +117,7 @@ export class RulesMonitor {
         changes,
         findings,
         reviewPackage,
+        reviewHistory: await this.listReviewHistory(),
         accessNote: this.networkAccessNote(),
       };
     } catch (error) {
@@ -485,19 +493,72 @@ export class RulesMonitor {
     return reviewPackage;
   }
 
-  async completeReview(id = null) {
+  async completeReview(id = null, { reviewMessage = null } = {}) {
+    const completedAt = new Date().toISOString();
     if (id) {
+      const reviewPackage = await this.loadReviewPackageById(id).catch(() => null);
+      if (reviewPackage?.available) {
+        await this.saveReviewHistory({
+          ...reviewPackage,
+          status: "completed",
+          completedAt,
+          reviewMessage: this.cleanReviewMessage(reviewMessage),
+        });
+      }
       await rm(path.join(this.reviewDir, `${id}.diff`), { force: true });
       await rm(path.join(this.reviewDir, `${id}.json`), { force: true });
     } else {
       const reviewPackage = await this.firstReviewPackage();
-      if (reviewPackage.available) await this.completeReview(reviewPackage.id);
+      if (reviewPackage.available) await this.completeReview(reviewPackage.id, { reviewMessage });
       await rm(this.reviewQueueFile, { force: true });
     }
     return this.emptyReviewPackage({
       status: "completed",
-      completedAt: new Date().toISOString(),
+      completedAt,
     });
+  }
+
+  async saveReviewHistory(entry) {
+    const history = await this.listReviewHistory({ limit: 50 });
+    const next = [
+      {
+        id: entry.id,
+        status: entry.status,
+        role: entry.role,
+        rulesFile: entry.rulesFile,
+        rulesPath: entry.rulesPath,
+        files: this.reviewFileMetadata(entry.files ?? []),
+        completedAt: entry.completedAt,
+        reviewMessage: entry.reviewMessage || "Разобрано без текста AI-замечаний.",
+      },
+      ...history.filter((item) => item.id !== entry.id),
+    ].slice(0, 20);
+    await mkdir(path.dirname(this.reviewHistoryFile), { recursive: true });
+    await writeFile(this.reviewHistoryFile, JSON.stringify(next, null, 2), "utf8");
+  }
+
+  async listReviewHistory({ limit = 5 } = {}) {
+    try {
+      const history = JSON.parse(await readFile(this.reviewHistoryFile, "utf8"));
+      if (!Array.isArray(history)) return [];
+      return history.slice(0, limit).map((entry) => ({
+        id: String(entry.id ?? ""),
+        status: String(entry.status ?? "completed"),
+        role: String(entry.role ?? ""),
+        rulesFile: entry.rulesFile ? String(entry.rulesFile) : null,
+        rulesPath: entry.rulesPath ? String(entry.rulesPath) : null,
+        files: this.reviewFileMetadata(entry.files ?? []),
+        completedAt: String(entry.completedAt ?? ""),
+        reviewMessage: this.cleanReviewMessage(entry.reviewMessage),
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  cleanReviewMessage(message) {
+    if (typeof message !== "string") return "";
+    return message.trim().replace(/\r\n/g, "\n").slice(0, 8000);
   }
 
   async firstReviewPackage({ includeText = false } = {}) {

@@ -116,7 +116,9 @@ export class DashboardServer {
 
       if (request.method === "POST" && url.pathname === "/api/rules/review-package/complete") {
         const body = await this.readRequestJson(request);
-        this.sendJson(response, 200, await this.requireRulesMonitor().completeReview(body.id));
+        this.sendJson(response, 200, await this.requireRulesMonitor().completeReview(body.id, {
+          reviewMessage: body.reviewMessage,
+        }));
         return;
       }
 
