@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { RULES_BASELINE_FILE, RULES_REVIEW_QUEUE_FILE } from "../config.js";
+import { RULES_BASELINE_FILE, RULES_REVIEW_DIR, RULES_REVIEW_QUEUE_FILE } from "../config.js";
 import { ConfigStore } from "./ConfigStore.js";
 import { RulesDiff } from "./RulesDiff.js";
 
@@ -21,6 +21,7 @@ export class RulesMonitor {
     }),
     baselineFile = RULES_BASELINE_FILE,
     reviewQueueFile = RULES_REVIEW_QUEUE_FILE,
+    reviewDir = RULES_REVIEW_DIR,
     rulesDiff = new RulesDiff(),
   } = {}) {
     this.rulesPath = initialRulesPath ? path.resolve(initialRulesPath) : null;
@@ -30,6 +31,7 @@ export class RulesMonitor {
     this.configStore = configStore;
     this.baselineFile = baselineFile;
     this.reviewQueueFile = reviewQueueFile;
+    this.reviewDir = reviewDir;
     this.rulesDiff = rulesDiff;
   }
 
@@ -71,7 +73,7 @@ export class RulesMonitor {
     };
   }
 
-  async status({ updateBaseline = true } = {}) {
+  async status({ updateBaseline = true, includeReviewText = true } = {}) {
     await this.loadConfig();
     if (!this.rulesPath && !this.rulesFile) {
       return {
@@ -90,8 +92,8 @@ export class RulesMonitor {
       const findings = this.analyze(scan.documents, changes);
       const freshReviewPackage = this.rulesDiff.build(previous.documents ?? [], scan.documents, changes);
       const reviewPackage = freshReviewPackage.available
-        ? await this.saveReviewPackage(freshReviewPackage)
-        : await this.loadReviewPackage();
+        ? await this.saveReviewPackage(freshReviewPackage, { includeText: includeReviewText })
+        : await this.pendingReview({ includeText: includeReviewText });
 
       if (updateBaseline) {
         await this.saveBaseline(scan);
@@ -433,31 +435,47 @@ export class RulesMonitor {
 
   async loadReviewPackage() {
     try {
-      return JSON.parse(await readFile(this.reviewQueueFile, "utf8"));
+      const legacy = JSON.parse(await readFile(this.reviewQueueFile, "utf8"));
+      if (legacy.available && legacy.text) {
+        return this.saveReviewPackage(legacy, { includeText: true });
+      }
+      return legacy;
     } catch {
       return this.emptyReviewPackage();
     }
   }
 
-  async saveReviewPackage(reviewPackage) {
+  async saveReviewPackage(reviewPackage, { includeText = false } = {}) {
+    const id = this.reviewPackageId(reviewPackage);
+    const diffFile = path.join(this.reviewDir, `${id}.diff`);
+    const metadataFile = path.join(this.reviewDir, `${id}.json`);
     const payload = {
-      ...reviewPackage,
       available: true,
+      id,
+      mode: reviewPackage.mode,
       status: "pending",
       createdAt: new Date().toISOString(),
       role: this.rulesRole,
       rulesPath: this.rulesPath,
       rulesFile: this.rulesFile,
+      reviewDir: this.reviewDir,
+      diffFile,
+      files: this.reviewFileMetadata(reviewPackage.files),
+      note: reviewPackage.note,
     };
-    await mkdir(path.dirname(this.reviewQueueFile), { recursive: true });
-    await writeFile(this.reviewQueueFile, JSON.stringify(payload, null, 2), "utf8");
-    return payload;
+    await mkdir(this.reviewDir, { recursive: true });
+    await writeFile(diffFile, reviewPackage.text, "utf8");
+    await writeFile(metadataFile, JSON.stringify(payload, null, 2), "utf8");
+    await rm(this.reviewQueueFile, { force: true });
+    return includeText ? { ...payload, text: reviewPackage.text } : payload;
   }
 
-  async pendingReview({ complete = false } = {}) {
-    const reviewPackage = await this.loadReviewPackage();
+  async pendingReview({ complete = false, includeText = false, id = null } = {}) {
+    const reviewPackage = id
+      ? await this.loadReviewPackageById(id, { includeText })
+      : await this.firstReviewPackage({ includeText });
     if (complete && reviewPackage.available) {
-      await this.completeReview();
+      await this.completeReview(reviewPackage.id);
       return {
         ...reviewPackage,
         status: "completed",
@@ -467,12 +485,77 @@ export class RulesMonitor {
     return reviewPackage;
   }
 
-  async completeReview() {
-    await rm(this.reviewQueueFile, { force: true });
+  async completeReview(id = null) {
+    if (id) {
+      await rm(path.join(this.reviewDir, `${id}.diff`), { force: true });
+      await rm(path.join(this.reviewDir, `${id}.json`), { force: true });
+    } else {
+      const reviewPackage = await this.firstReviewPackage();
+      if (reviewPackage.available) await this.completeReview(reviewPackage.id);
+      await rm(this.reviewQueueFile, { force: true });
+    }
     return this.emptyReviewPackage({
       status: "completed",
       completedAt: new Date().toISOString(),
     });
+  }
+
+  async firstReviewPackage({ includeText = false } = {}) {
+    const packages = await this.listReviewPackages();
+    if (packages.length === 0) return this.loadReviewPackage();
+    return this.loadReviewPackageById(packages[0].id, { includeText });
+  }
+
+  async listReviewPackages() {
+    let entries;
+    try {
+      entries = await readdir(this.reviewDir, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+
+    const packages = [];
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+      try {
+        const metadata = JSON.parse(await readFile(path.join(this.reviewDir, entry.name), "utf8"));
+        packages.push(this.sanitizeReviewMetadata(metadata));
+      } catch {
+        continue;
+      }
+    }
+    packages.sort((left, right) => String(left.createdAt).localeCompare(String(right.createdAt)));
+    return packages;
+  }
+
+  async loadReviewPackageById(id, { includeText = false } = {}) {
+    if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new Error("Invalid review package id.");
+    const metadataFile = path.join(this.reviewDir, `${id}.json`);
+    const metadata = this.sanitizeReviewMetadata(JSON.parse(await readFile(metadataFile, "utf8")));
+    if (!includeText) return metadata;
+    const text = await readFile(path.join(this.reviewDir, `${id}.diff`), "utf8");
+    return { ...metadata, text };
+  }
+
+  reviewPackageId(reviewPackage) {
+    const hash = createHash("sha256").update(reviewPackage.text).digest("hex").slice(0, 12);
+    const stamp = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
+    return `${stamp}-${hash}`;
+  }
+
+  reviewFileMetadata(files = []) {
+    return files.map((file) => ({
+      file: file.file,
+      type: file.type,
+      truncated: Boolean(file.truncated),
+    }));
+  }
+
+  sanitizeReviewMetadata(metadata) {
+    return {
+      ...metadata,
+      files: this.reviewFileMetadata(metadata.files ?? []),
+    };
   }
 
   emptyReviewPackage(extra = {}) {
@@ -480,6 +563,7 @@ export class RulesMonitor {
       available: false,
       mode: "local-diff",
       status: "empty",
+      reviewDir: this.reviewDir,
       files: [],
       text: "",
       note: "Нет ожидающих diff для AI-анализа.",

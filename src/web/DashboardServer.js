@@ -100,6 +100,7 @@ export class DashboardServer {
       if (request.method === "GET" && url.pathname === "/api/rules") {
         this.sendJson(response, 200, await this.requireRulesMonitor().status({
           updateBaseline: url.searchParams.get("baseline") !== "false",
+          includeReviewText: url.searchParams.get("reviewText") !== "false",
         }));
         return;
       }
@@ -107,12 +108,22 @@ export class DashboardServer {
       if (request.method === "GET" && url.pathname === "/api/rules/review-package") {
         this.sendJson(response, 200, await this.requireRulesMonitor().pendingReview({
           complete: url.searchParams.get("complete") === "true",
+          includeText: url.searchParams.get("text") === "true",
+          id: url.searchParams.get("id"),
         }));
         return;
       }
 
       if (request.method === "POST" && url.pathname === "/api/rules/review-package/complete") {
-        this.sendJson(response, 200, await this.requireRulesMonitor().completeReview());
+        const body = await this.readRequestJson(request);
+        this.sendJson(response, 200, await this.requireRulesMonitor().completeReview(body.id));
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/rules/review-packages") {
+        this.sendJson(response, 200, {
+          packages: await this.requireRulesMonitor().listReviewPackages(),
+        });
         return;
       }
 

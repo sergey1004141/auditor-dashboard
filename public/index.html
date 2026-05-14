@@ -405,6 +405,34 @@
         margin-top: 8px;
       }
 
+      .rules-review-path {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 7px;
+        align-items: center;
+        margin-top: 8px;
+        padding: 6px 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #fbfcfe;
+        font-size: 12px;
+      }
+
+      .rules-review-path code {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .rules-review-path a {
+        border-radius: 6px;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 800;
+        padding: 5px 8px;
+        text-decoration: none;
+      }
+
       .rules-diff {
         border: 1px solid var(--line);
         border-radius: 6px;
@@ -658,6 +686,11 @@
               <div class="rules-chip"><strong>Изменения</strong><span id="rulesChanges">-</span></div>
               <button type="submit">Сохранить</button>
             </form>
+            <div class="rules-review-path" id="rulesReviewPath" hidden>
+              <strong>Каталог diff</strong>
+              <code id="rulesReviewDir"></code>
+              <a id="rulesReviewOpen" href="#" target="_blank" rel="noopener">Открыть</a>
+            </div>
             <div class="rules-list" id="rulesFindings"></div>
             <div class="rules-list" id="rulesDiff"></div>
           </div>
@@ -916,6 +949,7 @@
         $("rulesStatus").textContent = status.status || "-";
         if (status.rulesFile || status.rulesPath) $("rulesPath").value = status.rulesFile || status.rulesPath;
         if (status.role) $("rulesRole").value = status.role;
+        renderRulesReviewPath(status.reviewPackage);
 
         const changes = status.changes || { added: [], modified: [], deleted: [] };
         const changeCount = changes.added.length + changes.modified.length + changes.deleted.length;
@@ -925,6 +959,7 @@
         const diffList = $("rulesDiff");
         list.innerHTML = "";
         diffList.innerHTML = "";
+        diffList.dataset.reviewId = "";
         renderRulesDiff(status.reviewPackage);
         const findings = Array.isArray(status.findings) ? status.findings.slice(0, 10) : [];
         const criticalFindings = findings.filter((finding) => finding.severity === "critical");
@@ -966,6 +1001,7 @@
       function renderRulesDiff(reviewPackage) {
         const diffList = $("rulesDiff");
         if (!reviewPackage?.available || !reviewPackage.text) return;
+        diffList.dataset.reviewId = reviewPackage.id || "";
 
         const item = document.createElement("div");
         item.className = "rules-diff";
@@ -986,8 +1022,20 @@
         diffList.append(item);
       }
 
+      function renderRulesReviewPath(reviewPackage) {
+        const root = $("rulesReviewPath");
+        const dir = reviewPackage?.reviewDir;
+        root.hidden = !dir;
+        if (!dir) return;
+        $("rulesReviewDir").textContent = dir;
+        $("rulesReviewOpen").href = `file:///${dir.replaceAll("\\", "/")}`;
+      }
+
       async function completeRulesReview() {
-        await request("/api/rules/review-package/complete", { method: "POST" });
+        await request("/api/rules/review-package/complete", {
+          method: "POST",
+          body: JSON.stringify({ id: $("rulesDiff").dataset.reviewId || null }),
+        });
         const status = await request("/api/rules?baseline=false", 10000);
         renderRules(status);
       }
