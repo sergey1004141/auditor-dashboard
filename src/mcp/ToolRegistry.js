@@ -117,6 +117,11 @@ export class ToolRegistry {
         inputSchema: { type: "object", properties: {}, additionalProperties: false },
       },
       {
+        name: "codex_limits",
+        description: "Return current Codex remaining rate limits with reset clock times.",
+        inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      },
+      {
         name: "system_services",
         description: "Return status for important Windows services, or selected service names.",
         inputSchema: {
@@ -227,7 +232,7 @@ export class ToolRegistry {
       case "reset_baseline":
         return this.result(await this.projectMonitor.resetBaseline());
       case "system_summary":
-        return this.result(await this.requireSystemStatus().summary());
+        return this.result(await this.systemSummary());
       case "runtime_metrics":
         return this.result(await this.requireSystemStatus().runtimeMetrics());
       case "cpu_metrics":
@@ -240,6 +245,8 @@ export class ToolRegistry {
         return this.result(await this.requireSystemStatus().gpuMetrics());
       case "token_usage":
         return this.result(await this.requireTokenUsage().status());
+      case "codex_limits":
+        return this.result(await this.codexLimits());
       case "system_services":
         return this.result(await this.requireSystemStatus().services(args.names ?? []));
       case "rdp_status":
@@ -289,6 +296,44 @@ export class ToolRegistry {
       throw new Error("Token usage service is not configured.");
     }
     return this.tokenUsageService;
+  }
+
+  async systemSummary() {
+    const summary = await this.requireSystemStatus().summary();
+    try {
+      const limits = await this.codexLimits();
+      return {
+        ...summary,
+        codexLimits: limits,
+      };
+    } catch (error) {
+      return {
+        ...summary,
+        codexLimits: {
+          available: false,
+          message: error.message,
+        },
+      };
+    }
+  }
+
+  async codexLimits() {
+    const usage = await this.requireTokenUsage().status();
+    return {
+      available: usage.available,
+      sampledAt: usage.sampledAt,
+      primary: usage.rateLimits?.primary ?? null,
+      secondary: usage.rateLimits?.secondary ?? null,
+      display: {
+        primary: usage.rateLimits?.primary
+          ? `${usage.rateLimits.primary.label}: ${usage.rateLimits.primary.remainingPercentFormatted} до ${usage.rateLimits.primary.resetsAtTime}`
+          : null,
+        secondary: usage.rateLimits?.secondary
+          ? `${usage.rateLimits.secondary.label}: ${usage.rateLimits.secondary.remainingPercentFormatted} до ${usage.rateLimits.secondary.resetsAtTime}`
+          : null,
+      },
+      source: "local Codex token_count session logs",
+    };
   }
 
   result(value) {
