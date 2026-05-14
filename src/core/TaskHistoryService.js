@@ -37,7 +37,8 @@ export class TaskHistoryService {
       }
     }
 
-    rows.sort((left, right) => this.sortTime(right.modified) - this.sortTime(left.modified));
+    const uniqueRows = this.latestRowsByTask(rows);
+    uniqueRows.sort((left, right) => this.compareRowsByModified(left, right));
 
     return {
       available: true,
@@ -49,7 +50,7 @@ export class TaskHistoryService {
         path: file.absolute,
         modified: file.modified,
       })),
-      rows,
+      rows: uniqueRows,
     };
   }
 
@@ -124,6 +125,23 @@ export class TaskHistoryService {
     if (!value) return 0;
     const parsed = Date.parse(value.replace(" ", "T"));
     return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  latestRowsByTask(rows) {
+    const latestByTask = new Map();
+    for (const row of rows) {
+      const current = latestByTask.get(row.task);
+      if (!current || this.sortTime(row.modified) >= this.sortTime(current.modified)) {
+        latestByTask.set(row.task, row);
+      }
+    }
+    return [...latestByTask.values()];
+  }
+
+  compareRowsByModified(left, right) {
+    const timeDiff = this.sortTime(right.modified) - this.sortTime(left.modified);
+    if (timeDiff !== 0) return timeDiff;
+    return left.task.localeCompare(right.task, "ru", { numeric: true });
   }
 
   formatMsk(date) {
